@@ -3,13 +3,8 @@ package main
 import (
 	"fmt"
 	"net"
-
 	//"os"
-	"time"
 )
-
-
-
 
 func tcpServer(IP string, port int) {
 	// Create a TCP address for the listener.
@@ -56,15 +51,21 @@ func handleConnection(conn net.Conn) {
 			fmt.Println("Error reading from connection:", err)
 			return
 		}
+		//print message
+		message := string(buffer[:n])
+		fmt.Printf("Recieved message: %s\n", message)
 
-		// Print the received message
-		fmt.Printf("Received message: %s\n", string(buffer[:n]))
+		//echo message back
+		_, err = conn.Write(buffer[:n])
+		if err != nil {
+			fmt.Printf("Error writing to connection:", err)
+			return
+		}
 	}
 
-	
 }
 
-func tcpClient(address string, port int) {
+func tcpClient(serverIP string, serverPort int, localPort int) {
 	// Resolve the TCP address of the destination
 	destAddr, err := net.ResolveTCPAddr("tcp", fmt.Sprintf("%s:%d", address, port))
 	if err != nil {
@@ -72,25 +73,65 @@ func tcpClient(address string, port int) {
 		return
 	}
 
-	// Create a TCP connection
+	// Create a TCP connection to server
 	conn, err := net.DialTCP("tcp", nil, destAddr)
 	if err != nil {
 		fmt.Println("Error creating connection:", err)
 		return
 	}
 
-	go handleConnection(conn)
+	defer conn.Close()
+	//go handleConnection(conn) ikke riktig
 
-	time.Sleep(1 * time.Second)
-	conn.Close() // Ensure the connection is closed after sending the message
+	//send the "connect to" message
+	localIP, err := getLocalIP()
+	if err != nil {
+		fmt.Printf("Error determining local IP:", err)
+		return
+	}
 
-	
+	connectMessage := fmt.Sprintf("Connect to: %s:%d\000", localIP, localPort)
+	_, err = conn.Write([]byte(connectMessage))
+	if err != nil {
+		fmt.Println("Error sending connect message:", err)
+		return
+	}
+
+	//handle messages from server
+	buffer := make([]byte, 1024)
+	for {
+		n, err := conn.Read(buffer)
+		if err != nil {
+			fmt.Println("Error reading from server:", err)
+			return
+		}
+		fmt.Printf("Server: %s\n", string(buffer[:n]))
+	}
+
+	//time.Sleep(1 * time.Second)
+	//conn.Close() // Ensure the connection is closed after sending the message
+
+}
+
+func getLocalIP() (string, error) {
+	address, err := net.InterfaceAddrs()
+	if err != nil {
+		return "", err
+	}
+
+	for _, addr := range address {
+		if ipNet, ok := addr.(*net.IPNet); ok && !ipNet.IP.IsLoopback() {
+			return ipNet.IP.String(), nil
+		}
+	}
+	return "", fmt.Errorf("no IP address found")
 }
 
 func main() {
 	addr := "10.100.23.204"
 
-	tcpClient(addr, 33546)
+	go tcpServer("0.0.0.0", 20022)
 
+	tcpClient(addr, 33546, 20022) //this line is the connection part
 	select {}
 }
