@@ -6,7 +6,7 @@ import (
 	"time"
 )
 
-func simple_fsm(elevator *Elevator,
+func SimpleFsm(elevator *Elevator,
 	reqchan chan elevio.ButtonEvent,
 	new_floor_chan chan int,
 	obstr_chan chan bool,

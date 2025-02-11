@@ -10,7 +10,7 @@ func main() {
 
 	elevio.Init("localhost:15657", numFloors)
 
-	elevator := elevatorInit()
+	elevator := ElevatorInit()
 
 	var d elevio.MotorDirection = elevio.MD_Up
 	elevio.SetMotorDirection(d)
@@ -31,7 +31,7 @@ func main() {
 	}
 	elevio.SetMotorDirection(elevio.MD_Stop)
 
-	go simple_fsm(elevator, drv_buttons, drv_floors, drv_obstr, drv_stop, numFloors) //try to make this work instead
+	go SimpleFsm(elevator, drv_buttons, drv_floors, drv_obstr, drv_stop, numFloors) //try to make this work instead
 	go elevator.processQueue()
 
 	/*

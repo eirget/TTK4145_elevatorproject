@@ -35,7 +35,7 @@ func (e *Elevator) AddToQueue(floor int) {
 
 //struct med "events" også? slik at
 
-func elevatorInit() *Elevator {
+func ElevatorInit() *Elevator {
 	return &Elevator{
 		Floor_nr:  1,
 		Direction: 0,
