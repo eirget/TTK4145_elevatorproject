@@ -1,50 +1,67 @@
 package main
 
-import "Driver-go/elevio"
+import (
+	"Driver-go/elevio"
+	"fmt"
+	"time"
+)
 
-func simple_fsm(req chan elevio.ButtonEvent) {
+func simple_fsm(elevator *Elevator,
+	reqchan chan elevio.ButtonEvent,
+	new_floor_chan chan int,
+	obstr_chan chan bool,
+	stop_chan chan bool,
+	number_of_floors int) {
 	for {
 		select {
-		case a := <- drv_buttons:
+		case a := <-reqchan:
 			fmt.Printf("%+v\n", a)
 			elevio.SetButtonLamp(a.Button, a.Floor, true)
-			simple_req_fsm(a)
-			
-		
-		/*
-		case a := <- drv_floors:
+			elevator.AddToQueue(a.Floor)
+
+		case a := <-new_floor_chan:
 			fmt.Printf("%+v\n", a)
-			if a == numFloors-1 {
-				d = elevio.MD_Down
-			} else if a == 0 {
-				d = elevio.MD_Up
+			elevator.Floor_nr = a
+
+			// If the elevator reaches its first destination in queue
+			if len(elevator.Queue) > 0 && elevator.Queue[0] == a {
+				elevio.SetMotorDirection(elevio.MD_Stop) // Stop elevator
+				fmt.Println("Stopping for 5 seconds...")
+				elevio.SetDoorOpenLamp(true)
+				time.Sleep(5 * time.Second) // Wait for passengers
+				elevio.SetDoorOpenLamp(false)
+				// Remove first floor from queue
+				elevator.Queue = elevator.Queue[1:]
+
+				// Turn off floor button light
+				elevio.SetButtonLamp(elevio.BT_HallUp, a, false)
+				elevio.SetButtonLamp(elevio.BT_HallDown, a, false)
+				elevio.SetButtonLamp(elevio.BT_Cab, a, false)
+
+				fmt.Println("Resuming movement...")
 			}
-			//elevio.SetMotorDirection(d)
 
-
-		case a := <- drv_obstr:
+		case a := <-obstr_chan:
 			fmt.Printf("%+v\n", a)
 			if a {
-				//elevio.SetMotorDirection(elevio.MD_Stop)
+				elevio.SetMotorDirection(elevio.MD_Stop)
 			} else {
-				//elevio.SetMotorDirection(d)
+				elevio.SetMotorDirection(elevio.MotorDirection(elevator.Direction))
 			}
 
-		case a := <- drv_stop:
+		case a := <-stop_chan:
 			fmt.Printf("%+v\n", a)
-			for f := 0; f < numFloors; f++ {
+			elevator.Queue = []int{}
+			for f := 0; f < number_of_floors; f++ {
 				for b := elevio.ButtonType(0); b < 3; b++ {
 					elevio.SetButtonLamp(b, f, false)
 				}
-			} */
+			}
 		}
 	}
 }
 
-func simple_req_fsm() {
-	//deal with request
-}
-
+/*
 func fsm(e *Elevator) { //må ta inn mange channels for ulike "signaler"
 	//mutex rundt alt for å beskytte states igjen kanskje
 	for {
@@ -57,10 +74,11 @@ func fsm(e *Elevator) { //må ta inn mange channels for ulike "signaler"
 
 			case obstruction := <-
 
-			case light_update := <- 
+			case light_update := <-
 
 			case timer := <- //ulike cases for ulike timere om vi ender opp med flere
 				//om dør har vært åpen lenge nok --> kjør videre (f.eks)
 		}
 	}
 }
+*/
