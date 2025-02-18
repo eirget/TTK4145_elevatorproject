@@ -23,7 +23,7 @@ func SimpleFsm(elevator *Elevator,
 			fmt.Printf("%+v\n", a)
 			elevator.Floor_nr = a
 			elevio.SetFloorIndicator(a)
-			
+
 			// heller lage en funksjon inni en annen modul som gjør alt dette sikkert
 
 			// If the elevator reaches its first destination in queue
@@ -33,33 +33,34 @@ func SimpleFsm(elevator *Elevator,
 				elevio.SetDoorOpenLamp(true)
 				time.Sleep(5 * time.Second) // Wait for passengers
 				if elevator.Obstruction {
-					obstruction_happened(*elevator)
-				} else {
-					elevio.SetDoorOpenLamp(false)
-					// Remove first floor from queue
-					elevator.Queue = elevator.Queue[1:]
+					go elevator.checkForObstruction()
 
-					// Turn off floor button light
+					<-elevator.Resumed
+				}
+				elevio.SetDoorOpenLamp(false)
+				// Remove first floor from queue
+				elevator.Queue = elevator.Queue[1:]
+
+				// Turn off floor button light
 				elevio.SetButtonLamp(elevio.BT_HallUp, a, false)
 				elevio.SetButtonLamp(elevio.BT_HallDown, a, false)
 				elevio.SetButtonLamp(elevio.BT_Cab, a, false)
 
 				fmt.Println("Resuming movement...")
-				}
-				
+
 			}
 
 		case a := <-obstr_chan:
 			fmt.Printf("%+v\n", a)
 			elevator.Obstruction = a
 			/*
-			if a && elevio.GetFloor() != -1 {
-				elevio.SetMotorDirection(elevio.MD_Stop) //sørger for at den ikke kjører videre
-				elevio.SetDoorOpenLamp(true)        // dersom døren ikke allerede er åpen, gjør ingenting om lyset allerede er på
-				// antar at lampen lyser så lenge obstruction er på
-			} else { //dersom vi ikke befinner oss på en etasje, trenger vi ikke gjøre noe
-				fmt.Println("Obstruction activated, not on floor.") // Kan fjernes når kode er good
-			}
+				if a && elevio.GetFloor() != -1 {
+					elevio.SetMotorDirection(elevio.MD_Stop) //sørger for at den ikke kjører videre
+					elevio.SetDoorOpenLamp(true)        // dersom døren ikke allerede er åpen, gjør ingenting om lyset allerede er på
+					// antar at lampen lyser så lenge obstruction er på
+				} else { //dersom vi ikke befinner oss på en etasje, trenger vi ikke gjøre noe
+					fmt.Println("Obstruction activated, not on floor.") // Kan fjernes når kode er good
+				}
 			*/
 		case a := <-stop_chan:
 			fmt.Printf("%+v\n", a)
