@@ -16,16 +16,20 @@ func SimpleFsm(elevator *Elevator,
 		select {
 		case a := <-reqchan:
 			fmt.Printf("%+v\n", a)
-			elevio.SetButtonLamp(a.Button, a.Floor, true)
 			elevator.AddToQueue(a.Floor)
+			elevio.SetButtonLamp(a.Button, a.Floor, true)
 
 		case a := <-new_floor_chan:
 			fmt.Printf("%+v\n", a)
-			elevator.Floor_nr = a
+			if a != -1 {
+				elevator.Floor_nr = a
+			}
+
+			// heller lage en funksjon inni en annen modul som gjør alt dette sikkert
 
 			// If the elevator reaches its first destination in queue
 			if len(elevator.Queue) > 0 && elevator.Queue[0] == a {
-				elevio.SetMotorDirection(elevio.MD_Stop) // Stop elevator
+				elevator.Direction = elevio.MD_Stop // Stop elevator
 				fmt.Println("Stopping for 5 seconds...")
 				elevio.SetDoorOpenLamp(true)
 				time.Sleep(5 * time.Second) // Wait for passengers
@@ -43,20 +47,26 @@ func SimpleFsm(elevator *Elevator,
 
 		case a := <-obstr_chan:
 			fmt.Printf("%+v\n", a)
-			if a {
-				elevio.SetMotorDirection(elevio.MD_Stop)
-			} else {
-				elevio.SetMotorDirection(elevio.MotorDirection(elevator.Direction))
+
+			if a && elevator.Floor_nr != -1 {
+				elevator.Direction = elevio.MD_Stop //sørger for at den ikke kjører videre
+				elevio.SetDoorOpenLamp(true)        // dersom døren ikke allerede er åpen, gjør ingenting om lyset allerede er på
+				// antar at lampen lyser så lenge obstruction er på
+			} else { //dersom vi ikke befinner oss på en etasje, trenger vi ikke gjøre noe
+				fmt.Println("Obstruction activated, not on floor.") // Kan fjernes når kode er good
 			}
 
 		case a := <-stop_chan:
 			fmt.Printf("%+v\n", a)
+			elevio.SetStopLamp(true)
 			elevator.Queue = []int{}
 			for f := 0; f < number_of_floors; f++ {
 				for b := elevio.ButtonType(0); b < 3; b++ {
 					elevio.SetButtonLamp(b, f, false)
 				}
 			}
+			time.Sleep(5 * time.Second)
+			elevio.SetStopLamp(false)
 		}
 	}
 }

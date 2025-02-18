@@ -9,7 +9,7 @@ import (
 type Elevator struct {
 	//mutex over states maybe to protect
 	Floor_nr  int
-	Direction int
+	Direction elevio.MotorDirection
 	On_floor  bool
 	Door_open bool
 	Queue     []int
@@ -38,7 +38,7 @@ func (e *Elevator) AddToQueue(floor int) {
 func ElevatorInit() *Elevator {
 	return &Elevator{
 		Floor_nr:  1,
-		Direction: 0,
+		Direction: elevio.MD_Stop,
 		On_floor:  false,
 		Door_open: false,
 		Queue:     []int{},
@@ -57,10 +57,10 @@ func (e *Elevator) processQueue() {
 
 		if e.Floor_nr < targetFloor {
 			fmt.Println("Moving Up...")
-			elevio.SetMotorDirection(elevio.MD_Up)
+			e.Direction = elevio.MD_Up
 		} else if e.Floor_nr > targetFloor {
 			fmt.Println("Moving Down...")
-			elevio.SetMotorDirection(elevio.MD_Down)
+			e.Direction = elevio.MD_Down
 		}
 
 		// Wait for floor update in the main FSM

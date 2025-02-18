@@ -10,8 +10,6 @@ func main() {
 
 	elevio.Init("localhost:15657", numFloors)
 
-	elevator := ElevatorInit()
-
 	var d elevio.MotorDirection = elevio.MD_Up
 	elevio.SetMotorDirection(d)
 
@@ -25,15 +23,27 @@ func main() {
 	go elevio.PollObstructionSwitch(drv_obstr)
 	go elevio.PollStopButton(drv_stop)
 
+	for f := 0; f < numFloors; f++ {
+		for b := elevio.ButtonType(0); b < 3; b++ {
+			elevio.SetButtonLamp(b, f, false)
+		}
+	}
+
 	a := <-drv_floors
 	for a == -1 {
 		elevio.SetMotorDirection(d)
 	}
 	elevio.SetMotorDirection(elevio.MD_Stop)
 
+	elevator := ElevatorInit()
+
+	go elevio.SetFloorIndicator(elevator.Floor_nr) //Kobler floor sensor med floor indicator light
+
+	go elevio.SetMotorDirection(elevator.Direction)
 	go SimpleFsm(elevator, drv_buttons, drv_floors, drv_obstr, drv_stop, numFloors) //try to make this work instead
 	go elevator.processQueue()
 
+	select {}
 	/*
 	   for {
 	       select {
