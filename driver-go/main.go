@@ -35,11 +35,12 @@ func main() {
 	}
 	elevio.SetMotorDirection(elevio.MD_Stop)
 
-	elevator := ElevatorInit()
+	
+	elevator := ElevatorInit(a)
 
-	go elevio.SetFloorIndicator(elevator.Floor_nr) //Kobler floor sensor med floor indicator light
+	go elevio.SetFloorIndicator(elevator.Floor_nr) //Kobler floor sensor med floor indicator light, funker ikke
+	go elevio.SetMotorDirection(elevator.Direction) //tror det må være samme grun til at denne ikke funker
 
-	go elevio.SetMotorDirection(elevator.Direction)
 	go SimpleFsm(elevator, drv_buttons, drv_floors, drv_obstr, drv_stop, numFloors) //try to make this work instead
 	go elevator.processQueue()
 

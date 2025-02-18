@@ -12,6 +12,7 @@ type Elevator struct {
 	Direction elevio.MotorDirection
 	On_floor  bool
 	Door_open bool
+	Obstruction bool
 	Queue     []int
 }
 
@@ -21,26 +22,17 @@ const (
 	Stop = 0
 )
 
-func (e *Elevator) AddToQueue(floor int) {
-	// Check if the floor is already in the queue to avoid duplicates
-	for _, f := range e.Queue {
-		if f == floor {
-			return
-		}
-	}
 
-	e.Queue = append(e.Queue, floor)
-	fmt.Println("Added floor:", floor, "Updated Queue:", e.Queue)
-}
 
 //struct med "events" også? slik at
 
-func ElevatorInit() *Elevator {
+func ElevatorInit(floor_nr int) *Elevator {
 	return &Elevator{
-		Floor_nr:  1,
+		Floor_nr:  floor_nr,
 		Direction: elevio.MD_Stop,
-		On_floor:  false,
+		On_floor:  true,
 		Door_open: false,
+		Obstruction: false,
 		Queue:     []int{},
 	}
 }
@@ -54,16 +46,32 @@ func (e *Elevator) processQueue() {
 		}
 
 		targetFloor := e.Queue[0] // Get first floor in queue
+		fmt.Printf("TargetFloor: %+v\n", targetFloor)
+		fmt.Printf("Floor_nr: %+v\n", e.Floor_nr)
 
 		if e.Floor_nr < targetFloor {
 			fmt.Println("Moving Up...")
-			e.Direction = elevio.MD_Up
+			elevio.SetMotorDirection(elevio.MD_Up)
 		} else if e.Floor_nr > targetFloor {
 			fmt.Println("Moving Down...")
-			e.Direction = elevio.MD_Down
-		}
-
+			elevio.SetMotorDirection(elevio.MD_Down)
+		} 
 		// Wait for floor update in the main FSM
 		time.Sleep(100 * time.Millisecond)
 	}
+}
+
+
+func obstruction_happened(e Elevator, ) {
+	for e.Obstruction {}
+	elevio.SetDoorOpenLamp(false)
+	// Remove first floor from queue
+	e.Queue = e.Queue[1:]
+
+	// Turn off floor button light
+	elevio.SetButtonLamp(elevio.BT_HallUp, e.Floor_nr, false)
+	elevio.SetButtonLamp(elevio.BT_HallDown, e.Floor_nr, false)
+	elevio.SetButtonLamp(elevio.BT_Cab, e.Floor_nr, false)
+
+	fmt.Println("Resuming movement...")
 }

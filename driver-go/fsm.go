@@ -16,46 +16,51 @@ func SimpleFsm(elevator *Elevator,
 		select {
 		case a := <-reqchan:
 			fmt.Printf("%+v\n", a)
-			elevator.AddToQueue(a.Floor)
+			elevator.dealWithNewReq(a.Floor)
 			elevio.SetButtonLamp(a.Button, a.Floor, true)
 
 		case a := <-new_floor_chan:
 			fmt.Printf("%+v\n", a)
-			if a != -1 {
-				elevator.Floor_nr = a
-			}
-
+			elevator.Floor_nr = a
+			elevio.SetFloorIndicator(a)
+			
 			// heller lage en funksjon inni en annen modul som gjør alt dette sikkert
 
 			// If the elevator reaches its first destination in queue
 			if len(elevator.Queue) > 0 && elevator.Queue[0] == a {
-				elevator.Direction = elevio.MD_Stop // Stop elevator
+				elevio.SetMotorDirection(elevio.MD_Stop) // Stop elevator
 				fmt.Println("Stopping for 5 seconds...")
 				elevio.SetDoorOpenLamp(true)
 				time.Sleep(5 * time.Second) // Wait for passengers
-				elevio.SetDoorOpenLamp(false)
-				// Remove first floor from queue
-				elevator.Queue = elevator.Queue[1:]
+				if elevator.Obstruction {
+					obstruction_happened(*elevator)
+				} else {
+					elevio.SetDoorOpenLamp(false)
+					// Remove first floor from queue
+					elevator.Queue = elevator.Queue[1:]
 
-				// Turn off floor button light
+					// Turn off floor button light
 				elevio.SetButtonLamp(elevio.BT_HallUp, a, false)
 				elevio.SetButtonLamp(elevio.BT_HallDown, a, false)
 				elevio.SetButtonLamp(elevio.BT_Cab, a, false)
 
 				fmt.Println("Resuming movement...")
+				}
+				
 			}
 
 		case a := <-obstr_chan:
 			fmt.Printf("%+v\n", a)
-
-			if a && elevator.Floor_nr != -1 {
-				elevator.Direction = elevio.MD_Stop //sørger for at den ikke kjører videre
+			elevator.Obstruction = a
+			/*
+			if a && elevio.GetFloor() != -1 {
+				elevio.SetMotorDirection(elevio.MD_Stop) //sørger for at den ikke kjører videre
 				elevio.SetDoorOpenLamp(true)        // dersom døren ikke allerede er åpen, gjør ingenting om lyset allerede er på
 				// antar at lampen lyser så lenge obstruction er på
 			} else { //dersom vi ikke befinner oss på en etasje, trenger vi ikke gjøre noe
 				fmt.Println("Obstruction activated, not on floor.") // Kan fjernes når kode er good
 			}
-
+			*/
 		case a := <-stop_chan:
 			fmt.Printf("%+v\n", a)
 			elevio.SetStopLamp(true)
