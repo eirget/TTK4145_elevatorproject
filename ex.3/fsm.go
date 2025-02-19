@@ -12,11 +12,18 @@ func SimpleFsm(elevator *Elevator,
 	obstr_chan chan bool,
 	stop_chan chan bool,
 	number_of_floors int) {
+
+	doorTimer := time.NewTimer(0)
+	<-doorTimer.C
+
+	obstructionTimer := time.NewTimer(0)
+	<-obstructionTimer.C
+
 	for {
 		select {
 		case a := <-reqchan:
 			fmt.Printf("%+v\n", a)
-			elevator.dealWithNewReq(a.Floor)
+			elevator.dealWithNewReq(a.Floor, a.Button)
 			elevio.SetButtonLamp(a.Button, a.Floor, true)
 
 		case a := <-new_floor_chan:
@@ -27,28 +34,62 @@ func SimpleFsm(elevator *Elevator,
 			// heller lage en funksjon inni en annen modul som gjør alt dette sikkert
 
 			// If the elevator reaches its first destination in queue
-			if len(elevator.Queue) > 0 && elevator.Queue[0] == a {
+			if len(elevator.Queue) > 0 && elevator.Queue[0].Floor == a {
 				elevio.SetMotorDirection(elevio.MD_Stop) // Stop elevator
+				elevator.Direction = elevio.MD_Stop
 				fmt.Println("Stopping for 5 seconds...")
 				elevio.SetDoorOpenLamp(true)
-				time.Sleep(5 * time.Second) // Wait for passengers
-				if elevator.Obstruction {
-					go elevator.checkForObstruction()
 
-					<-elevator.Resumed
-				}
+				doorTimer.Reset(5 * time.Second)
+			}
+
+
+		case <-doorTimer.C:
+
+			if elevator.Obstruction {
+				fmt.Println("Waiting for obstruction to clear...")
+				obstructionTimer.Reset(500 * time.Millisecond)
+			} else {
 				elevio.SetDoorOpenLamp(false)
 				// Remove first floor from queue
-				elevator.Queue = elevator.Queue[1:]
-
 				// Turn off floor button light
-				elevio.SetButtonLamp(elevio.BT_HallUp, a, false)
-				elevio.SetButtonLamp(elevio.BT_HallDown, a, false)
-				elevio.SetButtonLamp(elevio.BT_Cab, a, false)
+				elevio.SetButtonLamp(elevator.Queue[0].Button_direction, elevator.Queue[0].Floor, false)
+				elevio.SetButtonLamp(elevio.BT_Cab, elevator.Queue[0].Floor, false)
+
+				fmt.Printf("%+v\n", elevator.Queue)
+
+				elevator.Queue = elevator.Queue[1:]
+				
 
 				fmt.Println("Resuming movement...")
-
+				fmt.Println("Resuming with queue:")
+				fmt.Printf("%+v\n", elevator.Queue)
 			}
+
+		case <-obstructionTimer.C:
+			if elevator.Obstruction {
+				obstructionTimer.Reset(500 * time.Millisecond)
+			} else {
+				fmt.Println("Obstruction cleared")
+				
+
+				elevio.SetDoorOpenLamp(false)
+
+				elevio.SetButtonLamp(elevator.Queue[0].Button_direction, elevator.Queue[0].Floor, false)
+				elevio.SetButtonLamp(elevio.BT_Cab, elevator.Queue[0].Floor, false)
+
+				fmt.Printf("%+v\n", elevator.Queue)
+
+				elevator.Queue = elevator.Queue[1:]
+				
+				
+
+				fmt.Println("Resuming movement...")
+				fmt.Println("Resuming with queue:")
+				fmt.Printf("%+v\n", elevator.Queue)
+			}
+			
+
 
 		case a := <-obstr_chan:
 			fmt.Printf("%+v\n", a)
@@ -65,7 +106,7 @@ func SimpleFsm(elevator *Elevator,
 		case a := <-stop_chan:
 			fmt.Printf("%+v\n", a)
 			elevio.SetStopLamp(true)
-			elevator.Queue = []int{}
+			elevator.Queue = []Order{}
 			for f := 0; f < number_of_floors; f++ {
 				for b := elevio.ButtonType(0); b < 3; b++ {
 					elevio.SetButtonLamp(b, f, false)
@@ -77,24 +118,3 @@ func SimpleFsm(elevator *Elevator,
 	}
 }
 
-/*
-func fsm(e *Elevator) { //må ta inn mange channels for ulike "signaler"
-	//mutex rundt alt for å beskytte states igjen kanskje
-	for {
-		select{
-			case request := <- ...: //chan for incoming request
-				fsm_for_new_request()
-
-			case floor_sensor_update := <- ...:
-				fsm_for_floor_sensor_update()
-
-			case obstruction := <-
-
-			case light_update := <-
-
-			case timer := <- //ulike cases for ulike timere om vi ender opp med flere
-				//om dør har vært åpen lenge nok --> kjør videre (f.eks)
-		}
-	}
-}
-*/

@@ -28,6 +28,8 @@ func main() {
 			elevio.SetButtonLamp(b, f, false)
 		}
 	}
+	elevio.SetDoorOpenLamp(false)
+	elevio.SetStopLamp(false)
 
 	a := <-drv_floors
 	for a == -1 {

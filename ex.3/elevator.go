@@ -6,6 +6,11 @@ import (
 	"time"
 )
 
+type Order struct {
+	Floor int
+	Button_direction elevio.ButtonType
+}
+
 type Elevator struct {
 	//mutex over states maybe to protect
 	Floor_nr    int
@@ -13,8 +18,8 @@ type Elevator struct {
 	On_floor    bool
 	Door_open   bool
 	Obstruction bool
-	Queue       []int
-	Resumed     chan bool
+	Queue       []Order
+	
 }
 
 const (
@@ -32,8 +37,7 @@ func ElevatorInit(floor_nr int) *Elevator {
 		On_floor:    true,
 		Door_open:   false,
 		Obstruction: false,
-		Queue:       []int{},
-		Resumed:     make(chan bool),
+		Queue:       []Order{},
 	}
 }
 
@@ -45,16 +49,19 @@ func (e *Elevator) processQueue() {
 			continue
 		}
 
-		targetFloor := e.Queue[0] // Get first floor in queue
-		fmt.Printf("TargetFloor: %+v\n", targetFloor)
-		fmt.Printf("Floor_nr: %+v\n", e.Floor_nr)
+
+		targetFloor := e.Queue[0].Floor // Get first floor in queue
+		//fmt.Printf("TargetFloor: %+v\n", targetFloor)
+		//fmt.Printf("Floor_nr: %+v\n", e.Floor_nr)
 
 		if e.Floor_nr < targetFloor {
 			fmt.Println("Moving Up...")
 			elevio.SetMotorDirection(elevio.MD_Up)
+			e.Direction = elevio.MD_Up
 		} else if e.Floor_nr > targetFloor {
 			fmt.Println("Moving Down...")
 			elevio.SetMotorDirection(elevio.MD_Down)
+			e.Direction = elevio.MD_Down
 		}
 		// Wait for floor update in the main FSM
 		time.Sleep(100 * time.Millisecond)
@@ -78,11 +85,4 @@ func obstruction_happened(e Elevator) {
 }
 */
 
-func (e *Elevator) checkForObstruction() {
-	for e.Obstruction {
-		// Wait for obstruction to be cleared (this does not block other activities)
-		time.Sleep(500 * time.Millisecond) // Just checking at intervals
-	}
-	// Once obstruction is cleared, we resume normal operation
-	e.Resumed <- true
-}
+
