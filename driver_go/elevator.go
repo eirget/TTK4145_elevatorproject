@@ -5,7 +5,7 @@ import (
 )
 
 type OrderType struct {
-	State bool
+	State      bool
 	ElevatorID int
 }
 
@@ -16,8 +16,20 @@ type Elevator struct {
 	On_floor    bool
 	Door_open   bool
 	Obstruction bool
-	Orders [3][4]OrderType
+	Orders      [3][4]OrderType
+	Config      Config
 }
+
+type Config struct {
+	ClearRequestVariant ClearRequestVariant
+}
+
+type ClearRequestVariant int
+
+const (
+	CV_All ClearRequestVariant = iota
+	CV_InDirn
+)
 
 func ElevatorInit(floor_nr int) *Elevator {
 	return &Elevator{
@@ -27,9 +39,9 @@ func ElevatorInit(floor_nr int) *Elevator {
 		Door_open:   false,
 		Obstruction: false,
 		Orders: [3][4]OrderType{
-				{{false, 0}, {false,0}, {false, 0}, {false, 0}},
-				{{false, 0}, {false,0}, {false, 0}, {false, 0}},
-				{{false, 0}, {false,0}, {false, 0}, {false, 0}},
+			{{false, 0}, {false, 0}, {false, 0}, {false, 0}},
+			{{false, 0}, {false, 0}, {false, 0}, {false, 0}},
+			{{false, 0}, {false, 0}, {false, 0}, {false, 0}},
 		},
 	}
 }

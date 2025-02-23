@@ -4,9 +4,11 @@ import (
 	"Driver_go/elevio"
 )
 
+var NumFloors = 4
+
 func main() {
 
-	numFloors := 4 
+	numFloors := 4
 
 	elevio.Init("localhost:15657", numFloors)
 
@@ -40,6 +42,5 @@ func main() {
 	elevator := ElevatorInit(a)
 
 	elevio.SetFloorIndicator(elevator.Floor_nr)
-
 
 }
