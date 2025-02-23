@@ -9,6 +9,20 @@ type OrderType struct {
 	ElevatorID int
 }
 
+type ElevatorBehavior int
+
+const (
+	EB_Idle ElevatorBehavior = iota
+	EB_DoorOpen
+	EB_Moving
+)
+
+const (
+	BT_HallUp = 0
+	BT_HallDown = 1
+	BT_Cab = 2
+)
+
 type Elevator struct {
 	//mutex over states maybe to protect
 	Floor_nr    int
@@ -16,7 +30,8 @@ type Elevator struct {
 	On_floor    bool
 	Door_open   bool
 	Obstruction bool
-	Orders      [3][4]OrderType
+	Orders      [4][3]OrderType
+	Behavior 	ElevatorBehavior
 	Config      Config
 }
 
@@ -38,10 +53,13 @@ func ElevatorInit(floor_nr int) *Elevator {
 		On_floor:    true,
 		Door_open:   false,
 		Obstruction: false,
-		Orders: [3][4]OrderType{
-			{{false, 0}, {false, 0}, {false, 0}, {false, 0}},
-			{{false, 0}, {false, 0}, {false, 0}, {false, 0}},
-			{{false, 0}, {false, 0}, {false, 0}, {false, 0}},
+		Orders: [4][3]OrderType{
+			{{false, 0}, {false, 5}, {false, 0}},
+			{{false, 0}, {false, 0}, {false, 0}},
+			{{false, 0}, {false, 0}, {false, 0}},
+			{{false, 5}, {false, 0}, {false, 0}},
 		},
+		Behavior: 	EB_Idle,
+		Config: Config{ClearRequestVariant: CV_InDirn},
 	}
 }

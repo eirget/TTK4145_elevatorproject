@@ -5,6 +5,7 @@ import (
 )
 
 var NumFloors = 4
+var NumButtons = 3
 
 func main() {
 
@@ -42,5 +43,9 @@ func main() {
 	elevator := ElevatorInit(a)
 
 	elevio.SetFloorIndicator(elevator.Floor_nr)
+
+	go fsm(elevator, drv_buttons, drv_floors, drv_obstr, drv_stop, NumFloors)
+
+	select {}
 
 }

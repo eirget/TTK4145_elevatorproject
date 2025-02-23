@@ -4,7 +4,7 @@ import "Driver_go/elevio"
 
 func (e *Elevator) requestsAbove() bool {
 	for f := e.Floor_nr + 1; f < NumFloors; f++ {
-		for btn := 0; btn < NumFloors; btn++ { //er NumFloors riktig?
+		for btn := 0; btn < NumButtons; btn++ { //er NumButtons riktig?
 			if e.Orders[f][btn].State != false {
 				return true
 			}
@@ -16,7 +16,7 @@ func (e *Elevator) requestsAbove() bool {
 // requestsBelow checks for requests below the current floor.
 func (e *Elevator) requestsBelow() bool {
 	for f := 0; f < e.Floor_nr; f++ {
-		for btn := 0; btn < NumFloors; btn++ { ////er NumFloors riktig?
+		for btn := 0; btn < NumButtons; btn++ { ////er NumButtons riktig?
 			if e.Orders[f][btn].State != false {
 				return true
 			}
@@ -27,7 +27,7 @@ func (e *Elevator) requestsBelow() bool {
 
 // requestsHere checks for requests at the current floor.
 func (e *Elevator) requestsHere() bool {
-	for btn := 0; btn < NumFloors; btn++ {
+	for btn := 0; btn < NumButtons; btn++ {
 		if e.Orders[e.Floor_nr][btn].State != false {
 			return true
 		}
@@ -85,7 +85,7 @@ func (e *Elevator) shouldStop() bool {
 			!e.requestsBelow()
 	case elevio.MD_Up:
 		return e.Orders[e.Floor_nr][BT_HallUp].State != false ||
-			e.Orders[e.Floor_nr][BT_Cab] != false ||
+			e.Orders[e.Floor_nr][BT_Cab].State != false ||
 			!e.requestsAbove()
 	case elevio.MD_Stop:
 		return true
@@ -98,25 +98,32 @@ func (e *Elevator) shouldStop() bool {
 func (e *Elevator) clearAtCurrentFloor() {
 	switch e.Config.ClearRequestVariant {
 	case CV_All:
-		for btn := 0; btn < NumFloors; btn++ { //så lenge N_buttons = numFloors
+		for btn := 0; btn < NumButtons; btn++ { //så lenge N_buttons = NumButtons
 			e.Orders[e.Floor_nr][btn].State = false
 		}
 	case CV_InDirn:
 		e.Orders[e.Floor_nr][BT_Cab].State = false
+		elevio.SetButtonLamp(BT_Cab, e.Floor_nr, false)
 		switch e.Direction {
 		case elevio.MD_Up:
 			if !e.requestsAbove() && e.Orders[e.Floor_nr][BT_HallUp].State == false {
 				e.Orders[e.Floor_nr][BT_HallDown].State = false
+				elevio.SetButtonLamp(BT_HallDown, e.Floor_nr, false)
 			}
 			e.Orders[e.Floor_nr][BT_HallUp].State = false
+			elevio.SetButtonLamp(BT_HallUp, e.Floor_nr, false)
 		case elevio.MD_Down:
 			if !e.requestsBelow() && e.Orders[e.Floor_nr][BT_HallDown].State == false {
 				e.Orders[e.Floor_nr][BT_HallUp].State = false
+				elevio.SetButtonLamp(BT_HallUp, e.Floor_nr, false)
 			}
 			e.Orders[e.Floor_nr][BT_HallDown].State = false
+			elevio.SetButtonLamp(BT_HallDown, e.Floor_nr, false)
 		case elevio.MD_Stop:
 			e.Orders[e.Floor_nr][BT_HallUp].State = false
 			e.Orders[e.Floor_nr][BT_HallDown].State = false
+			elevio.SetButtonLamp(BT_HallDown, e.Floor_nr, false)
+			elevio.SetButtonLamp(BT_HallUp, e.Floor_nr, false)
 		}
 	}
 }
