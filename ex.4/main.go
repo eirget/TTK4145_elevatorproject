@@ -34,9 +34,12 @@ func main() {
 		runPrimary()
 	} else {
 		// This process will be the backup
+		
 		fmt.Println("Starting as BACKUP")
 		runBackup()
+		
 	}
+	
 }
 
 func tryBecomePrimary() bool {
@@ -65,6 +68,7 @@ func tryBecomePrimary() bool {
 
 	return true
 }
+
 
 func primaryIsAlive() bool {
 	// Check if heartbeat file exists and is recent
@@ -95,6 +99,7 @@ func spawnBackup() {
 	}
 
 	var cmd *exec.Cmd
+	
 
 	// Platform-specific terminal commands
 	switch runtime.GOOS {
@@ -104,11 +109,7 @@ func spawnBackup() {
 	case "linux":
 		// Linux - try gnome-terminal first, fallback to xterm
 		cmd = exec.Command("gnome-terminal", "--", "bash", "-c", "cd '"+dir+"' && '"+execPath+"'")
-		err = cmd.Run()
-		if err != nil {
-			// Try xterm if gnome-terminal fails
-			cmd = exec.Command("xterm", "-e", "cd '"+dir+"' && '"+execPath+"'")
-		}
+		
 	case "windows":
 		// Windows
 		cmd = exec.Command("cmd", "/C", "start", "cmd", "/k", "cd "+dir+" && "+execPath)
@@ -139,6 +140,7 @@ func spawnBackup() {
 			}
 		}
 	}
+	
 }
 
 func readCounter() int {
