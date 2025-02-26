@@ -46,7 +46,7 @@ const (
 	CV_InDirn
 )
 
-func ElevatorInit(floor_nr int) *Elevator {
+func ElevatorInit(floor_nr int, id int) *Elevator {
 	return &Elevator{
 		Floor_nr:    floor_nr,
 		Direction:   elevio.MD_Stop,
@@ -54,10 +54,10 @@ func ElevatorInit(floor_nr int) *Elevator {
 		Door_open:   false,
 		Obstruction: false,
 		Orders: [4][3]OrderType{
-			{{false, 0}, {false, 5}, {false, 0}},
-			{{false, 0}, {false, 0}, {false, 0}},
-			{{false, 0}, {false, 0}, {false, 0}},
-			{{false, 5}, {false, 0}, {false, 0}},
+			{{false, 0}, {false, 5}, {false, id}},
+			{{false, 0}, {false, 0}, {false, id}},
+			{{false, 0}, {false, 0}, {false, id}},
+			{{false, 5}, {false, 0}, {false, id}},
 		},
 		Behavior: 	EB_Idle,
 		Config: Config{ClearRequestVariant: CV_InDirn},

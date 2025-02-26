@@ -23,7 +23,10 @@ func fsm(elevator *Elevator,
 			fmt.Printf("%+v\n", a)
 			elevator.Orders[a.Floor][a.Button].State = true
 			elevator.Orders[a.Floor][a.Button].ElevatorID = 1 //må bli gitt et annet sted senere
-			elevio.SetButtonLamp(a.Button, a.Floor, true)
+			if a.Button == BT_Cab {
+				elevio.SetButtonLamp(a.Button, a.Floor, true)
+			}
+			
 
 			fmt.Printf("%+v\n", elevator.Orders)
 
@@ -33,7 +36,7 @@ func fsm(elevator *Elevator,
 
 			if elevator.Behavior == EB_Idle {
 				dirn, newBehavior := elevator.chooseDirection()
-				fmt.Println("chooseDirection said: ", newBehavior)
+				//fmt.Println("chooseDirection said: ", newBehavior)
 
 				switch newBehavior {
 				case EB_Moving: 
@@ -63,7 +66,7 @@ func fsm(elevator *Elevator,
 				elevator.Behavior = EB_DoorOpen
 				elevio.SetDoorOpenLamp(true)
 
-				doorTimer.Reset(5 * time.Second)
+				doorTimer.Reset(3 * time.Second)
 			}
 			
 		case <- doorTimer.C:
