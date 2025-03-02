@@ -14,6 +14,18 @@ type HelloMsg struct {
 	Iter 	int
 }
 
+type HRAElevState struct {
+	Behavior string `json:"behavior"` //behaviour?
+	Floor	int `json:"floor"`
+	Direction	string `json:"direction"`
+	CabRequests []bool `json:"cabRequests"`
+}
+
+type HRAInput struct {
+	HallRequests [][2]bool `json:"hallRequests"`
+	States map[string]HRAElevState `json:"states"`
+}
+
 
 var NumFloors = 4
 var NumButtons = 3
@@ -88,7 +100,21 @@ func main() {
 	}()
 	*/
 
+	//HALL REQUESTS
+	hallRequests := make([][2]bool, NumFloors)
+
+	//TODO: lag en non-blocking timer
+
 	fmt.Printf("Started elevator system")
+
+	//periodically run
+	for {
+		select {
+			case
+		}
+	}
+
+	
 
 	for {
 		select {
