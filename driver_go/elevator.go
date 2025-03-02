@@ -35,6 +35,18 @@ type Elevator struct {
 	Config      Config
 }
 
+var directionMap = map[elevio.MotorDirection]string {
+	elevio.MD_Up: "up",
+	elevio.MD_Down: "down",
+	elevio.MD_Stop: "stop",
+}
+
+var behaviorMap = map[ElevatorBehavior]string {
+	EB_Idle: "idle",
+	EB_DoorOpen: "doorOpen",
+	EB_Moving: "moving",
+}
+
 type Config struct {
 	ClearRequestVariant ClearRequestVariant
 }

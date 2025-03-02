@@ -4,9 +4,12 @@ import (
 	"Driver_go/elevio"
 	"Driver_go/network/bcast"
 	"Driver_go/network/peers"
+	"encoding/json"
 	"flag"
 	"fmt"
+	"os/exec"
 	"strconv"
+	"time"
 )
 
 type HelloMsg struct {
@@ -26,13 +29,17 @@ type HRAInput struct {
 	States map[string]HRAElevState `json:"states"`
 }
 
+const(
+	NumFloors = 4
+	NumButtons = 3
+)
 
-var NumFloors = 4
-var NumButtons = 3
 
 func main() {
 	
 	//NETWORK
+
+	hraExecutable := "hall_reqest_assigner"
 
 	var id string
 	flag.StringVar(&id, "id", "", "id of this peer")
@@ -44,14 +51,15 @@ func main() {
 	//we can enable/disable the transmitter after it has been started, coulb be used to signal that we are unavailable
 	peerTxEnable := make(chan bool)
 	//we make channels for sending and receiving our custom data types
-	ordersTx := make(chan [4][3]OrderType)
-	ordersRx := make(chan [4][3]OrderType)
+	elevStateTx := make(chan Elevator)
+	elevStateRx := make(chan Elevator)
+
 
 	go peers.Transmitter(15647, id, peerTxEnable)
 	go peers.Receiver(15647, peerUpdateCh)
 
-	go bcast.Transmitter(20022, ordersTx)
-	go bcast.Receiver(20022, ordersRx)
+	go bcast.Transmitter(20022, elevStateTx)
+	go bcast.Receiver(20022, elevStateRx)
 
 	elevio.Init("localhost:15657", NumFloors) //gjør til et flag
 
@@ -101,20 +109,16 @@ func main() {
 	*/
 
 	//HALL REQUESTS
-	hallRequests := make([][2]bool, NumFloors)
+	
 
-	//TODO: lag en non-blocking timer
+	//non-blocking timer
+	hraTimer := time.NewTimer(0)
+	<-hraTimer.C
+	hraTimer.Reset(1 * time.Second)
 
 	fmt.Printf("Started elevator system")
 
-	//periodically run
-	for {
-		select {
-			case
-		}
-	}
 
-	
 
 	for {
 		select {
@@ -124,13 +128,61 @@ func main() {
 			fmt.Printf("  New:      %q\n", p.New)
 			fmt.Printf("  Lost:     %q\n", p.Lost)
 
-		case a := <-ordersRx:  //kam hende denne vil miste orders om 
+		case a := <-elevStateRx:  //kan hende denne vil miste orders om det blir fullt i buffer
 			fmt.Printf("Recieved: \n")
-			fmt.Printf("%+v\n", a[0])
-			fmt.Printf("%+v\n", a[1])
-			fmt.Printf("%+v\n", a[2])
-			fmt.Printf("%+v\n", a[3])
+			fmt.Printf("Message from ID: %v\n", a.Orders[1][2].ElevatorID)
+			fmt.Printf("Floor_nr: %v\n", a.Floor_nr)
+			fmt.Printf("Direction %v\n", a.Direction)
+		
+		case <- hraTimer.C:
+			elevStateTx <- *elevator  //kanksje alt vi trenger å gjøre for å broadcaste vår state
+
+			hraTimer.Reset(1 * time.Second)
+			var hallRequests [][2]bool
+			var cabRequests []bool 
+			for i := 0; i < NumFloors; i++ {
+				hallRequests[i][0] = elevator.Orders[i][0].State
+				hallRequests[i][1] = elevator.Orders[i][1].State
+				cabRequests[i] = elevator.Orders[i][2].State
+			}
+			input := HRAInput {
+				HallRequests: hallRequests,
+				States: make(map[string]HRAElevState),
+			}
+
+			input.States[id] = HRAElevState{
+				Behavior: behaviorMap[elevator.Behavior],
+				Floor: elevator.Floor_nr,
+				Direction: directionMap[elevator.Direction],
+				CabRequests: cabRequests,
+			}
+
+			jsonBytes, err := json.Marshal(input)
+			if err != nil {
+				fmt.Println("json.Marshal error: ", err)
+				return
+			}
+
+			ret, err := exec.Command("../hall_request_assigner/"+hraExecutable, "-i", string(jsonBytes)).CombinedOutput()
+			if err != nil {
+				fmt.Println("exec.Command error: ", err)
+				fmt.Println(string(ret))
+				return
+			}
+
+			output := new(map[string][][2]bool)
+			err = json.Unmarshal(ret, &output)
+			if err != nil {
+				fmt.Println("json.Unmarshal error ", err)
+				return
+			}
+
+			fmt.Printf("output: \n")
+			for k, v := range *output {
+				fmt.Printf("%6v : %+v\n", k, v)
+			}
 		}
+
 	}
 
 
