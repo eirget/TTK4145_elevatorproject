@@ -28,7 +28,7 @@ func fsm(elevator *Elevator,
 			}
 			
 
-			fmt.Printf("%+v\n", elevator.Orders)
+			//fmt.Printf("%+v\n", elevator.Orders)
 
 		case <- time.After(100 * time.Millisecond):
 
