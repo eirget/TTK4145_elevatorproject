@@ -23,6 +23,7 @@ func fsm(elevator *Elevator,
 	new_floor_chan chan int,
 	obstr_chan chan bool,
 	stop_chan chan bool,
+	hra_chan chan bool,
 	number_of_floors int) {
 
 	doorTimer := time.NewTimer(0)
@@ -31,13 +32,18 @@ func fsm(elevator *Elevator,
 	for {
 		select {
 		case a := <-req_chan: //se fsm_onRequestButtonPress i fsm.c
+
 			fmt.Printf("%+v\n", a)
+			//lock
 			elevator.Orders[a.Floor][a.Button].State = true
-			elevator.Orders[a.Floor][a.Button].ElevatorID = 1 //må bli gitt et annet sted senere
+			//unlock
 			if a.Button == BT_Cab {
 				elevio.SetButtonLamp(a.Button, a.Floor, true)
 			}
-			go fsm_hallRequestAssigner(elevator, elevators, id, hallRequests, cabRequests, hraExecutable, elevStateTx)
+			elevStateTx <- *elevator
+			//før vi kjører hall_request_assigner så må alle i elevators ha samme hall_call states
+			hra_chan <- true
+			//when we get a hall_call, broadcast message that makes all elevators run hall_request assigner
 
 			//fmt.Printf("%+v\n", elevator.Orders)
 
@@ -78,7 +84,7 @@ func fsm(elevator *Elevator,
 
 				doorTimer.Reset(3 * time.Second)
 			}
-			go fsm_hallRequestAssigner(elevator, elevators, id, hallRequests, cabRequests, hraExecutable, elevStateTx)
+			hra_chan <- true
 
 		case <-doorTimer.C:
 
@@ -129,6 +135,8 @@ func fsm_hallRequestAssigner(elevator *Elevator,
 	cabRequests []bool,
 	hraExecutable string,
 	elevStateTx chan Elevator) {
+
+	hallRequestLock.Lock()
 	//elevStateTx <- *elevator  //kanksje alt vi trenger å gjøre for å broadcaste vår state
 	elevators[id] = *elevator
 
@@ -153,6 +161,8 @@ func fsm_hallRequestAssigner(elevator *Elevator,
 		}
 	}
 
+	hallRequestLock.Unlock()
+
 	jsonBytes, err := json.Marshal(input)
 	if err != nil {
 		fmt.Println("json.Marshal error: ", err)
@@ -172,6 +182,8 @@ func fsm_hallRequestAssigner(elevator *Elevator,
 
 	fmt.Println("Raw HRA output: ", string(ret))
 
+	hallRequestLock.Lock()
+
 	output := new(map[string][][2]bool)
 	err = json.Unmarshal(ret, &output)
 	if err != nil {
@@ -185,7 +197,9 @@ func fsm_hallRequestAssigner(elevator *Elevator,
 	}
 
 	for peerID, newRequests := range *output {
+		fmt.Println("peerID: ", peerID)
 		assignedID, _ := strconv.Atoi(peerID)
+		fmt.Println("assignedID: ", assignedID)
 		for f := 0; f < NumFloors; f++ {
 			//update our actual elevator pointer, just once, not in every iteration
 			elevator.Orders[f][0].State = newRequests[f][0]
@@ -197,13 +211,31 @@ func fsm_hallRequestAssigner(elevator *Elevator,
 				elev.Orders[f][1].State = newRequests[f][1]
 
 				if newRequests[f][0] {
+					fmt.Printf("if happened")
 					elev.Orders[f][0].ElevatorID = assignedID
 				}
 				if newRequests[f][1] {
+					fmt.Printf("if 2 happened")
+					elev.Orders[f][1].ElevatorID = assignedID
+				}
+			}
+		}
+		for f := 0; f < NumFloors; f++ {
+			for _, elev := range elevators {
+				if newRequests[f][0] == true {
+					fmt.Printf("if happened")
+					elev.Orders[f][0].ElevatorID = assignedID
+				}
+				if newRequests[f][1] == true {
+					fmt.Printf("if 2 happened")
 					elev.Orders[f][1].ElevatorID = assignedID
 				}
 			}
 		}
 	}
+	fmt.Printf("%+v\n", elevator.Orders) //!! her burde det være endringer
+
 	elevStateTx <- *elevator
+
+	hallRequestLock.Unlock()
 }

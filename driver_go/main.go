@@ -38,11 +38,12 @@ func main() {
 
 	hraExecutable := "hall_request_assigner"
 
+	//make this automatic later
 	var id string
 	flag.StringVar(&id, "id", "", "id of this peer")
+	var port string
+	flag.StringVar(&port, "port", "", "port of this peer")
 	flag.Parse()
-
-	id = strconv.Itoa(55)
 
 	hallRequests := make([][2]bool, NumFloors)
 	cabRequests := make([]bool, NumFloors)
@@ -63,10 +64,17 @@ func main() {
 	go peers.Transmitter(15647, id, peerTxEnable)
 	go peers.Receiver(15647, peerUpdateCh)
 
-	go bcast.Transmitter(20022, elevStateTx)
-	go bcast.Receiver(20022, elevStateRx)
+	go bcast.Transmitter(20456, elevStateTx)
+	go bcast.Receiver(20456, elevStateRx)
 
-	elevio.Init("localhost:20244", NumFloors) //gjør til et flag
+	run_hra := make(chan bool, 10)
+	receive_run_hra := make(chan bool, 10)
+
+	go bcast.Transmitter(20032, run_hra)
+	go bcast.Receiver(20032, receive_run_hra)
+
+	addr := "localhost:" + port
+	elevio.Init(addr, NumFloors) //gjør til et flag
 
 	var d elevio.MotorDirection = elevio.MD_Up
 	elevio.SetMotorDirection(d)
@@ -102,7 +110,8 @@ func main() {
 
 	elevio.SetFloorIndicator(elevator.Floor_nr)
 
-	go fsm(elevator, elevators, id, hallRequests, cabRequests, hraExecutable, drv_buttons, drv_floors, drv_obstr, drv_stop, NumFloors)
+	go fsm(elevator, elevators, id, hallRequests, cabRequests, hraExecutable, elevStateTx, drv_buttons, drv_floors, drv_obstr, drv_stop, run_hra, NumFloors)
+	//go hraSignalListener(elevator, elevators, id, hallRequests, cabRequests, hraExecutable, elevStateTx, run_hra)
 
 	//the example message, we just send one of these every second
 	/*
@@ -138,8 +147,15 @@ func main() {
 		//heartbeat check functionality in below case as well, time each ID, maybe peers is good enough already
 		case a := <-elevStateRx: //kan hende denne vil miste orders om det blir fullt i buffer
 			//update elevator to have newest state of other elevators
-			idStr := strconv.Itoa(a.Orders[0][2].ElevatorID)
+			idStr := strconv.Itoa(a.ID)
 			elevators[idStr] = a
+
+			if idStr != id {
+				for f := 0; f < NumFloors; f++ {
+					elevator.Orders[f][0] = a.Orders[f][0]
+					elevator.Orders[f][1] = a.Orders[f][1]
+				}
+			}
 
 			fmt.Printf("Recieved: \n")
 			fmt.Printf("Message from ID: %v\n", a.Orders[1][2].ElevatorID)
@@ -148,6 +164,11 @@ func main() {
 
 			//fmt.Printf("%+v\n", elevators)
 
+		case <-receive_run_hra:
+			go fsm_hallRequestAssigner(elevator, elevators, id, hallRequests, cabRequests, hraExecutable, elevStateRx)
+
+		case <-time.After(100 * time.Millisecond):
+			elevStateTx <- *elevator
 		}
 	}
 }
