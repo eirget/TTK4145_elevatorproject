@@ -18,33 +18,34 @@ const (
 )
 
 const (
-	BT_HallUp = 0
+	BT_HallUp   = 0
 	BT_HallDown = 1
-	BT_Cab = 2
+	BT_Cab      = 2
 )
 
 type Elevator struct {
 	//mutex over states maybe to protect
+	ID          int
 	Floor_nr    int
 	Direction   elevio.MotorDirection
 	On_floor    bool
 	Door_open   bool
 	Obstruction bool
 	Orders      [4][3]OrderType
-	Behavior 	ElevatorBehavior
+	Behavior    ElevatorBehavior
 	Config      Config
 }
 
-var directionMap = map[elevio.MotorDirection]string {
-	elevio.MD_Up: "up",
+var directionMap = map[elevio.MotorDirection]string{
+	elevio.MD_Up:   "up",
 	elevio.MD_Down: "down",
 	elevio.MD_Stop: "stop",
 }
 
-var behaviorMap = map[ElevatorBehavior]string {
-	EB_Idle: "idle",
+var behaviorMap = map[ElevatorBehavior]string{
+	EB_Idle:     "idle",
 	EB_DoorOpen: "doorOpen",
-	EB_Moving: "moving",
+	EB_Moving:   "moving",
 }
 
 type Config struct {
@@ -60,6 +61,7 @@ const (
 
 func ElevatorInit(floor_nr int, id int) *Elevator {
 	return &Elevator{
+		ID:          id,
 		Floor_nr:    floor_nr,
 		Direction:   elevio.MD_Stop,
 		On_floor:    true,
@@ -71,7 +73,7 @@ func ElevatorInit(floor_nr int, id int) *Elevator {
 			{{false, 0}, {false, 0}, {false, id}},
 			{{false, 5}, {false, 0}, {false, id}},
 		},
-		Behavior: 	EB_Idle,
-		Config: Config{ClearRequestVariant: CV_InDirn},
+		Behavior: EB_Idle,
+		Config:   Config{ClearRequestVariant: CV_InDirn},
 	}
 }

@@ -2,11 +2,23 @@ package main
 
 import (
 	"Driver_go/elevio"
+	"encoding/json"
 	"fmt"
+	"os/exec"
+	"strconv"
+	"sync"
 	"time"
 )
 
+var hallRequestLock sync.Mutex
+
 func fsm(elevator *Elevator,
+	elevators map[string]Elevator,
+	id string,
+	hallRequests [][2]bool,
+	cabRequests []bool,
+	hraExecutable string,
+	elevStateTx chan Elevator,
 	req_chan chan elevio.ButtonEvent,
 	new_floor_chan chan int,
 	obstr_chan chan bool,
@@ -15,22 +27,21 @@ func fsm(elevator *Elevator,
 
 	doorTimer := time.NewTimer(0)
 	<-doorTimer.C
-	
 
 	for {
-		select{
-		case a := <-req_chan:  //se fsm_onRequestButtonPress i fsm.c 
+		select {
+		case a := <-req_chan: //se fsm_onRequestButtonPress i fsm.c
 			fmt.Printf("%+v\n", a)
 			elevator.Orders[a.Floor][a.Button].State = true
 			elevator.Orders[a.Floor][a.Button].ElevatorID = 1 //må bli gitt et annet sted senere
 			if a.Button == BT_Cab {
 				elevio.SetButtonLamp(a.Button, a.Floor, true)
 			}
-			
+			go fsm_hallRequestAssigner(elevator, elevators, id, hallRequests, cabRequests, hraExecutable, elevStateTx)
 
 			//fmt.Printf("%+v\n", elevator.Orders)
 
-		case <- time.After(100 * time.Millisecond):
+		case <-time.After(100 * time.Millisecond):
 
 			//fmt.Println("Elevator behavior: ", elevator.Behavior)
 
@@ -39,7 +50,7 @@ func fsm(elevator *Elevator,
 				//fmt.Println("chooseDirection said: ", newBehavior)
 
 				switch newBehavior {
-				case EB_Moving: 
+				case EB_Moving:
 					elevator.Direction = dirn
 					elevator.Behavior = EB_Moving
 					elevio.SetMotorDirection(elevator.Direction)
@@ -53,9 +64,8 @@ func fsm(elevator *Elevator,
 				}
 
 			}
-			
 
-		case a := <- new_floor_chan:
+		case a := <-new_floor_chan:
 			elevator.Floor_nr = a
 			elevio.SetFloorIndicator(a)
 
@@ -68,8 +78,9 @@ func fsm(elevator *Elevator,
 
 				doorTimer.Reset(3 * time.Second)
 			}
-			
-		case <- doorTimer.C:
+			go fsm_hallRequestAssigner(elevator, elevators, id, hallRequests, cabRequests, hraExecutable, elevStateTx)
+
+		case <-doorTimer.C:
 
 			if elevator.Obstruction {
 				fmt.Println("Waiting for obstruction to clear...")
@@ -82,17 +93,16 @@ func fsm(elevator *Elevator,
 				elevator.Direction, elevator.Behavior = elevator.chooseDirection()
 				elevio.SetMotorDirection(elevator.Direction)
 
-
 				fmt.Println("Resuming movement...")
 				fmt.Println("Resuming with Orders:")
 				fmt.Printf("%+v\n", elevator.Orders)
 			}
 
-		case a := <- obstr_chan:
+		case a := <-obstr_chan:
 			fmt.Printf("%+v\n", a)
 			elevator.Obstruction = a
 
-		case a := <- stop_chan:
+		case a := <-stop_chan:
 			fmt.Printf("%+v\n", a)
 			elevio.SetStopLamp(true)
 			elevio.SetMotorDirection(elevio.MD_Stop)
@@ -110,5 +120,90 @@ func fsm(elevator *Elevator,
 		}
 	}
 
-	
+}
+
+func fsm_hallRequestAssigner(elevator *Elevator,
+	elevators map[string]Elevator,
+	id string,
+	hallRequests [][2]bool,
+	cabRequests []bool,
+	hraExecutable string,
+	elevStateTx chan Elevator) {
+	//elevStateTx <- *elevator  //kanksje alt vi trenger å gjøre for å broadcaste vår state
+	elevators[id] = *elevator
+
+	for i := 0; i < NumFloors; i++ {
+		hallRequests[i][0] = elevator.Orders[i][0].State
+		hallRequests[i][1] = elevator.Orders[i][1].State
 	}
+	input := HRAInput{
+		HallRequests: hallRequests,
+		States:       make(map[string]HRAElevState),
+	}
+
+	for peerID, elev := range elevators {
+		for f := 0; f < NumFloors; f++ {
+			cabRequests[f] = elev.Orders[f][2].State
+		}
+		input.States[peerID] = HRAElevState{
+			Behavior:    behaviorMap[elev.Behavior],
+			Floor:       elev.Floor_nr,
+			Direction:   directionMap[elev.Direction],
+			CabRequests: cabRequests,
+		}
+	}
+
+	jsonBytes, err := json.Marshal(input)
+	if err != nil {
+		fmt.Println("json.Marshal error: ", err)
+		return
+	}
+
+	fmt.Println("Length of hallreqs: ", len(hallRequests))
+	fmt.Println("Length of cabreqs: ", len(cabRequests))
+
+	//maybe need whole path
+	ret, err := exec.Command("../"+hraExecutable, "-i", string(jsonBytes)).CombinedOutput()
+	if err != nil {
+		fmt.Println("exec.Command error: ", err)
+		fmt.Println(string(ret))
+		return
+	}
+
+	fmt.Println("Raw HRA output: ", string(ret))
+
+	output := new(map[string][][2]bool)
+	err = json.Unmarshal(ret, &output)
+	if err != nil {
+		fmt.Println("json.Unmarshal error ", err)
+		return
+	}
+
+	fmt.Printf("output: \n")
+	for k, v := range *output {
+		fmt.Printf("%6v : %+v\n", k, v)
+	}
+
+	for peerID, newRequests := range *output {
+		assignedID, _ := strconv.Atoi(peerID)
+		for f := 0; f < NumFloors; f++ {
+			//update our actual elevator pointer, just once, not in every iteration
+			elevator.Orders[f][0].State = newRequests[f][0]
+			elevator.Orders[f][1].State = newRequests[f][1]
+
+			for _, elev := range elevators {
+				//now we only change inside "elevators" we need to actually update our "*Elevator"
+				elev.Orders[f][0].State = newRequests[f][0]
+				elev.Orders[f][1].State = newRequests[f][1]
+
+				if newRequests[f][0] {
+					elev.Orders[f][0].ElevatorID = assignedID
+				}
+				if newRequests[f][1] {
+					elev.Orders[f][1].ElevatorID = assignedID
+				}
+			}
+		}
+	}
+	elevStateTx <- *elevator
+}
