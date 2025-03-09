@@ -2,11 +2,13 @@ package main
 
 import (
 	"Driver_go/elevio"
+	"time"
 )
 
 type OrderType struct {
 	State      bool
 	ElevatorID int
+	Timestamp  time.Time
 }
 
 type ElevatorBehavior int
@@ -68,10 +70,10 @@ func ElevatorInit(floor_nr int, id int) *Elevator {
 		Door_open:   false,
 		Obstruction: false,
 		Orders: [4][3]OrderType{
-			{{false, 1000}, {false, 5}, {false, id}},
-			{{false, 1000}, {false, 1000}, {false, id}},
-			{{false, 1000}, {false, 1000}, {false, id}},
-			{{false, 5}, {false, 1000}, {false, id}},
+			{{false, 1000, time.Now()}, {false, 5, time.Now()}, {false, id, time.Now()}},
+			{{false, 1000, time.Now()}, {false, 1000, time.Now()}, {false, id, time.Now()}},
+			{{false, 1000, time.Now()}, {false, 1000, time.Now()}, {false, id, time.Now()}},
+			{{false, 5, time.Now()}, {false, 1000, time.Now()}, {false, id, time.Now()}},
 		},
 		Behavior: EB_Idle,
 		Config:   Config{ClearRequestVariant: CV_InDirn},

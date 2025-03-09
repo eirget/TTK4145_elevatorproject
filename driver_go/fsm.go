@@ -11,6 +11,7 @@ import (
 )
 
 var hallRequestLock sync.Mutex
+var new_order_flag bool
 
 func fsm(elevator *Elevator,
 	elevators map[string]Elevator,
@@ -36,15 +37,19 @@ func fsm(elevator *Elevator,
 			fmt.Printf("%+v\n", a)
 			//lock
 			elevator.Orders[a.Floor][a.Button].State = true
+			//NEW
+			elevator.Orders[a.Floor][a.Button].Timestamp = time.Now()
 			//unlock
 			if a.Button == BT_Cab {
 				elevio.SetButtonLamp(a.Button, a.Floor, true)
 			}
+
+			new_order_flag = true
 			elevStateTx <- *elevator
 			//før vi kjører hall_request_assigner så må alle i elevators ha samme hall_call states
-			hra_chan <- true
-			//when we get a hall_call, broadcast message that makes all elevators run hall_request assigner
 
+			//when we get a hall_call, broadcast message that makes all elevators run hall_request assigner
+			//hra_chan <- true
 			//fmt.Printf("%+v\n", elevator.Orders)
 
 		case <-time.After(100 * time.Millisecond):
@@ -84,7 +89,8 @@ func fsm(elevator *Elevator,
 
 				doorTimer.Reset(3 * time.Second)
 			}
-			hra_chan <- true
+			elevStateTx <- *elevator
+			//hra_chan <- true
 
 		case <-doorTimer.C:
 
@@ -200,38 +206,28 @@ func fsm_hallRequestAssigner(elevator *Elevator,
 		fmt.Println("peerID: ", peerID)
 		assignedID, _ := strconv.Atoi(peerID)
 		fmt.Println("assignedID: ", assignedID)
-		for f := 0; f < NumFloors; f++ {
-			//update our actual elevator pointer, just once, not in every iteration
-			elevator.Orders[f][0].State = newRequests[f][0]
-			elevator.Orders[f][1].State = newRequests[f][1]
-
-			for _, elev := range elevators {
-				//now we only change inside "elevators" we need to actually update our "*Elevator"
+		for i_id, elev := range elevators {
+			for f := 0; f < NumFloors; f++ {
 				elev.Orders[f][0].State = newRequests[f][0]
 				elev.Orders[f][1].State = newRequests[f][1]
 
 				if newRequests[f][0] {
-					fmt.Printf("if happened")
+					fmt.Println("if happened")
+					fmt.Println("assignedID: ", assignedID)
 					elev.Orders[f][0].ElevatorID = assignedID
+					fmt.Println("the actual ID of elev now:", elev.Orders[f][0].ElevatorID)
 				}
 				if newRequests[f][1] {
-					fmt.Printf("if 2 happened")
+					fmt.Println("if 2 happened")
+					fmt.Println("assignedID: ", assignedID)
 					elev.Orders[f][1].ElevatorID = assignedID
 				}
 			}
+			// Important: Reassign modified struct back into the map
+			elevators[i_id] = elev
 		}
-		for f := 0; f < NumFloors; f++ {
-			for _, elev := range elevators {
-				if newRequests[f][0] == true {
-					fmt.Printf("if happened")
-					elev.Orders[f][0].ElevatorID = assignedID
-				}
-				if newRequests[f][1] == true {
-					fmt.Printf("if 2 happened")
-					elev.Orders[f][1].ElevatorID = assignedID
-				}
-			}
-		}
+		//er cab calls det de skal være nå?
+		elevator.Orders = elevators[id].Orders
 	}
 	fmt.Printf("%+v\n", elevator.Orders) //!! her burde det være endringer
 

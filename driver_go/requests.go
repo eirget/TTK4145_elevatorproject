@@ -3,8 +3,8 @@ package main
 import "Driver_go/elevio"
 
 func (e *Elevator) requestsAbove() bool {
-	for f := e.Floor_nr + 1; f < NumFloors; f++ {
-		for btn := 0; btn < NumButtons; btn++ { //er NumButtons riktig?
+	for f := e.Floor_nr + 1; f < NumFloors; f++ { //blir "+1" feil, er nok riktig
+		for btn := 0; btn < NumButtons; btn++ { 
 			if e.Orders[f][btn].State && e.Orders[f][btn].ElevatorID == e.ID {
 				return true
 			}
@@ -16,7 +16,7 @@ func (e *Elevator) requestsAbove() bool {
 // requestsBelow checks for requests below the current floor.
 func (e *Elevator) requestsBelow() bool {
 	for f := 0; f < e.Floor_nr; f++ {
-		for btn := 0; btn < NumButtons; btn++ { ////er NumButtons riktig?
+		for btn := 0; btn < NumButtons; btn++ { 
 			if e.Orders[f][btn].State && e.Orders[f][btn].ElevatorID == e.ID {
 				return true
 			}

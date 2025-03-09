@@ -48,7 +48,7 @@ func main() {
 	hallRequests := make([][2]bool, NumFloors)
 	cabRequests := make([]bool, NumFloors)
 
-	//create map to store elevator states for all elevators on system
+	//create map to store elevator states for all elevators on system, !!! point to discuss: *Elevator or not?
 	elevators := make(map[string]Elevator)
 
 	fmt.Printf("%+v\n", elevators)
@@ -77,7 +77,7 @@ func main() {
 	elevio.Init(addr, NumFloors) //gjør til et flag
 
 	var d elevio.MotorDirection = elevio.MD_Up
-	elevio.SetMotorDirection(d)
+	//
 
 	drv_buttons := make(chan elevio.ButtonEvent)
 	drv_floors := make(chan int)
@@ -113,18 +113,6 @@ func main() {
 	go fsm(elevator, elevators, id, hallRequests, cabRequests, hraExecutable, elevStateTx, drv_buttons, drv_floors, drv_obstr, drv_stop, run_hra, NumFloors)
 	//go hraSignalListener(elevator, elevators, id, hallRequests, cabRequests, hraExecutable, elevStateTx, run_hra)
 
-	//the example message, we just send one of these every second
-	/*
-		go func() {
-			for {
-				ordersTx <- elevator.Orders
-				time.Sleep(1 * time.Second)
-			}
-		}()
-	*/
-
-	//HALL REQUESTS
-
 	//non-blocking timer
 	hraTimer := time.NewTimer(0)
 	<-hraTimer.C
@@ -132,7 +120,7 @@ func main() {
 
 	fmt.Printf("Started elevator system \n")
 
-	//TODO: NEED TO BROADCAST ELEVATOR STATES OFTEN
+	//TODO: NEED TO BROADCAST ELEVATOR STATES OFTEN, or just when changed
 
 	for {
 		select {
@@ -142,7 +130,10 @@ func main() {
 			fmt.Printf("  New:      %q\n", p.New)
 			fmt.Printf("  Lost:     %q\n", p.Lost)
 
-			//add to "elevators" if new
+			//NEW: maybe fix elevators knowing of eachother even without an event happening
+			if len(p.New) != 0 {
+				elevStateTx <- *elevator
+			}
 
 		//heartbeat check functionality in below case as well, time each ID, maybe peers is good enough already
 		case a := <-elevStateRx: //kan hende denne vil miste orders om det blir fullt i buffer
@@ -150,25 +141,39 @@ func main() {
 			idStr := strconv.Itoa(a.ID)
 			elevators[idStr] = a
 
-			if idStr != id {
-				for f := 0; f < NumFloors; f++ {
-					elevator.Orders[f][0] = a.Orders[f][0]
-					elevator.Orders[f][1] = a.Orders[f][1]
-				}
-			}
-
 			fmt.Printf("Recieved: \n")
 			fmt.Printf("Message from ID: %v\n", a.Orders[1][2].ElevatorID)
 			fmt.Printf("Floor_nr: %v\n", a.Floor_nr)
 			fmt.Printf("Direction %v\n", a.Direction)
+
+			//NEW, idea for fixing when hall requests should actually be updated
+			//func updateHallRequests(myElevator *Elevator, receivedElev Elevator) {
+			for f := 0; f < NumFloors; f++ {
+				for b := 0; b < NumButtons-1; b++ { // Only HallUp and HallDown
+					if a.Orders[f][b].State {
+						// Compare timestamps to ensure only newer updates are accepted
+						if a.Orders[f][b].Timestamp.After(elevator.Orders[f][b].Timestamp) {
+							elevator.Orders[f][b] = a.Orders[f][b]
+						}
+					}
+				}
+			}
+			//evig loop since hra also broadcasts in the end
+			if new_order_flag {
+				run_hra <- true
+				new_order_flag = false
+			}
+
+			//}
 
 			//fmt.Printf("%+v\n", elevators)
 
 		case <-receive_run_hra:
 			go fsm_hallRequestAssigner(elevator, elevators, id, hallRequests, cabRequests, hraExecutable, elevStateRx)
 
-		case <-time.After(100 * time.Millisecond):
-			elevStateTx <- *elevator
+			//might not be neccessary at all
+			//case <-time.After(500 * time.Millisecond):
+			//	elevStateTx <- *elevator
 		}
 	}
 }
