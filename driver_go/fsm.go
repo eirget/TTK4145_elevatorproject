@@ -43,7 +43,6 @@ func fsm(elevator *Elevator,
 			if a.Button == BT_Cab {
 				elevio.SetButtonLamp(a.Button, a.Floor, true)
 			}
-
 			new_order_flag = true
 			elevStateTx <- *elevator
 			//før vi kjører hall_request_assigner så må alle i elevators ha samme hall_call states
@@ -58,7 +57,7 @@ func fsm(elevator *Elevator,
 
 			if elevator.Behavior == EB_Idle {
 				dirn, newBehavior := elevator.chooseDirection()
-				//fmt.Println("chooseDirection said: ", newBehavior)
+				fmt.Println("chooseDirection said: ", newBehavior)
 
 				switch newBehavior {
 				case EB_Moving:
@@ -73,7 +72,6 @@ func fsm(elevator *Elevator,
 					doorTimer.Reset(5 * time.Second)
 
 				}
-
 			}
 
 		case a := <-new_floor_chan:
@@ -88,9 +86,11 @@ func fsm(elevator *Elevator,
 				elevio.SetDoorOpenLamp(true)
 
 				doorTimer.Reset(3 * time.Second)
+
+				//coorect to have this inside if?
+				new_order_flag = true
+				elevStateTx <- *elevator
 			}
-			elevStateTx <- *elevator
-			//hra_chan <- true
 
 		case <-doorTimer.C:
 

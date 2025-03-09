@@ -1,10 +1,13 @@
 package main
 
-import "Driver_go/elevio"
+import (
+	"Driver_go/elevio"
+	"fmt"
+)
 
 func (e *Elevator) requestsAbove() bool {
 	for f := e.Floor_nr + 1; f < NumFloors; f++ { //blir "+1" feil, er nok riktig
-		for btn := 0; btn < NumButtons; btn++ { 
+		for btn := 0; btn < NumButtons; btn++ {
 			if e.Orders[f][btn].State && e.Orders[f][btn].ElevatorID == e.ID {
 				return true
 			}
@@ -16,7 +19,7 @@ func (e *Elevator) requestsAbove() bool {
 // requestsBelow checks for requests below the current floor.
 func (e *Elevator) requestsBelow() bool {
 	for f := 0; f < e.Floor_nr; f++ {
-		for btn := 0; btn < NumButtons; btn++ { 
+		for btn := 0; btn < NumButtons; btn++ {
 			if e.Orders[f][btn].State && e.Orders[f][btn].ElevatorID == e.ID {
 				return true
 			}
@@ -96,6 +99,8 @@ func (e *Elevator) shouldStop() bool {
 
 // clearAtCurrentFloor clears requests at the current floor.
 func (e *Elevator) clearAtCurrentFloor() {
+	fmt.Printf("Before Clearing: Orders at Floor %d: %+v\n", e.Floor_nr, e.Orders[e.Floor_nr])
+
 	switch e.Config.ClearRequestVariant {
 	case CV_All:
 		for btn := 0; btn < NumButtons; btn++ {
@@ -104,38 +109,39 @@ func (e *Elevator) clearAtCurrentFloor() {
 			}
 		}
 	case CV_InDirn:
-		if e.Orders[e.Floor_nr][BT_Cab].ElevatorID == e.ID {
-			e.Orders[e.Floor_nr][BT_Cab].State = false
-			elevio.SetButtonLamp(BT_Cab, e.Floor_nr, false)
-		}
+		fmt.Println("Clearing CAB order at Floor", e.Floor_nr)
+		e.Orders[e.Floor_nr][BT_Cab].State = false
+		elevio.SetButtonLamp(BT_Cab, e.Floor_nr, false)
+
 		switch e.Direction {
 		case elevio.MD_Up:
-			if !e.requestsAbove() && e.Orders[e.Floor_nr][BT_HallUp].ElevatorID == e.ID {
+			fmt.Println("Clearing HallUp at Floor", e.Floor_nr)
+			e.Orders[e.Floor_nr][BT_HallUp].State = false
+			elevio.SetButtonLamp(BT_HallUp, e.Floor_nr, false)
+
+			if !e.requestsAbove() {
+				fmt.Println("Clearing HallDown at Floor", e.Floor_nr)
 				e.Orders[e.Floor_nr][BT_HallDown].State = false
 				elevio.SetButtonLamp(BT_HallDown, e.Floor_nr, false)
-			}
-			if e.Orders[e.Floor_nr][BT_HallUp].ElevatorID == e.ID {
-				e.Orders[e.Floor_nr][BT_HallUp].State = false
-				elevio.SetButtonLamp(BT_HallUp, e.Floor_nr, false)
 			}
 		case elevio.MD_Down:
-			if !e.requestsBelow() && e.Orders[e.Floor_nr][BT_HallDown].ElevatorID == e.ID {
+			fmt.Println("Clearing HallDown at Floor", e.Floor_nr)
+			e.Orders[e.Floor_nr][BT_HallDown].State = false
+			elevio.SetButtonLamp(BT_HallDown, e.Floor_nr, false)
+
+			if !e.requestsBelow() {
+				fmt.Println("Clearing HallUp at Floor", e.Floor_nr)
 				e.Orders[e.Floor_nr][BT_HallUp].State = false
 				elevio.SetButtonLamp(BT_HallUp, e.Floor_nr, false)
-			}
-			if e.Orders[e.Floor_nr][BT_HallDown].ElevatorID == e.ID {
-				e.Orders[e.Floor_nr][BT_HallDown].State = false
-				elevio.SetButtonLamp(BT_HallDown, e.Floor_nr, false)
 			}
 		case elevio.MD_Stop:
-			if e.Orders[e.Floor_nr][BT_HallUp].ElevatorID == e.ID {
-				e.Orders[e.Floor_nr][BT_HallUp].State = false
-				elevio.SetButtonLamp(BT_HallUp, e.Floor_nr, false)
-			}
-			if e.Orders[e.Floor_nr][BT_HallDown].ElevatorID == e.ID {
-				e.Orders[e.Floor_nr][BT_HallDown].State = false
-				elevio.SetButtonLamp(BT_HallDown, e.Floor_nr, false)
-			}
+			fmt.Println("Clearing HallUp and HallDown at Floor", e.Floor_nr)
+			e.Orders[e.Floor_nr][BT_HallUp].State = false
+			e.Orders[e.Floor_nr][BT_HallDown].State = false
+			elevio.SetButtonLamp(BT_HallUp, e.Floor_nr, false)
+			elevio.SetButtonLamp(BT_HallDown, e.Floor_nr, false)
 		}
 	}
+
+	fmt.Printf("After Clearing: Orders at Floor %d: %+v\n", e.Floor_nr, e.Orders[e.Floor_nr])
 }
