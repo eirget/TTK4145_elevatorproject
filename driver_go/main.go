@@ -49,7 +49,7 @@ func main() {
 	cabRequests := make([]bool, NumFloors)
 
 	//create map to store elevator states for all elevators on system, !!! point to discuss: *Elevator or not?
-	elevators := make(map[string]Elevator)
+	elevators := make(map[string]*Elevator)
 
 	fmt.Printf("%+v\n", elevators)
 
@@ -61,8 +61,8 @@ func main() {
 	elevStateTx := make(chan Elevator)
 	elevStateRx := make(chan Elevator)
 
-	go peers.Transmitter(15647, id, peerTxEnable)
-	go peers.Receiver(15647, peerUpdateCh)
+	go peers.Transmitter(15622, id, peerTxEnable)
+	go peers.Receiver(15622, peerUpdateCh)
 
 	go bcast.Transmitter(20456, elevStateTx)
 	go bcast.Receiver(20456, elevStateRx)
@@ -130,7 +130,7 @@ func main() {
 			fmt.Printf("  New:      %q\n", p.New)
 			fmt.Printf("  Lost:     %q\n", p.Lost)
 
-			//NEW: maybe fix elevators knowing of eachother even without an event happening
+			//fixed elevators knowing of eachother even without an event happening
 			if len(p.New) != 0 {
 				elevStateTx <- *elevator
 			}
@@ -139,26 +139,29 @@ func main() {
 		case a := <-elevStateRx: //kan hende denne vil miste orders om det blir fullt i buffer
 			//update elevator to have newest state of other elevators
 			idStr := strconv.Itoa(a.ID)
-			elevators[idStr] = a
+			
+			elevators[idStr] = &a  //may have to directly allocate new Elevator pointer
 
 			fmt.Printf("Recieved: \n")
 			fmt.Printf("Message from ID: %v\n", a.Orders[1][2].ElevatorID)
 			fmt.Printf("Floor_nr: %v\n", a.Floor_nr)
 			fmt.Printf("Direction %v\n", a.Direction)
+			fmt.Println("timestamp(hall up): \n", a.Orders[a.Floor_nr][BT_HallUp].Timestamp)
 
 			//NEW, idea for fixing when hall requests should actually be updated
 			//func updateHallRequests(myElevator *Elevator, receivedElev Elevator) {
-			for f := 0; f < NumFloors; f++ {
-				for b := 0; b < NumButtons-1; b++ { // Only HallUp and HallDown
-					if a.Orders[f][b].State {
+			//if idStr != id {
+				for f := 0; f < NumFloors; f++ {
+					for b := 0; b < NumButtons-1; b++ { // Only HallUp and HallDown
 						// Compare timestamps to ensure only newer updates are accepted
 						if a.Orders[f][b].Timestamp.After(elevator.Orders[f][b].Timestamp) {
 							elevator.Orders[f][b] = a.Orders[f][b]
 						}
 					}
 				}
-			}
-			//evig loop since hra also broadcasts in the end
+			//}
+			
+			
 			if new_order_flag {
 				run_hra <- true
 				new_order_flag = false

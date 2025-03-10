@@ -14,7 +14,7 @@ var hallRequestLock sync.Mutex
 var new_order_flag bool
 
 func fsm(elevator *Elevator,
-	elevators map[string]Elevator,
+	elevators map[string]*Elevator,
 	id string,
 	hallRequests [][2]bool,
 	cabRequests []bool,
@@ -37,9 +37,11 @@ func fsm(elevator *Elevator,
 			fmt.Printf("%+v\n", a)
 			//lock
 			elevator.Orders[a.Floor][a.Button].State = true
-			//NEW
+			//elevators[id] = elevator
 			elevator.Orders[a.Floor][a.Button].Timestamp = time.Now()
 			//unlock
+			fmt.Println("orders after button press: ", elevator.Orders)
+
 			if a.Button == BT_Cab {
 				elevio.SetButtonLamp(a.Button, a.Floor, true)
 			}
@@ -57,7 +59,7 @@ func fsm(elevator *Elevator,
 
 			if elevator.Behavior == EB_Idle {
 				dirn, newBehavior := elevator.chooseDirection()
-				fmt.Println("chooseDirection said: ", newBehavior)
+				//fmt.Println("chooseDirection said: ", newBehavior)
 
 				switch newBehavior {
 				case EB_Moving:
@@ -80,17 +82,20 @@ func fsm(elevator *Elevator,
 
 			if elevator.shouldStop() {
 				elevio.SetMotorDirection(elevio.MD_Stop)
-				elevator.clearAtCurrentFloor()
+				elevator.clearAtCurrentFloor() //timestamps are updated here
+				
 
 				elevator.Behavior = EB_DoorOpen
 				elevio.SetDoorOpenLamp(true)
 
 				doorTimer.Reset(3 * time.Second)
-
-				//coorect to have this inside if?
-				new_order_flag = true
-				elevStateTx <- *elevator
 			}
+
+			//new_order_flag = true    //correct to have this inside if?
+			fmt.Println("timestamp that will be broadcasted after clear(hall_down): ", elevator.Orders[a][BT_HallDown].Timestamp)
+			fmt.Println("timestamp that will be broadcasted after clear(hall up): ", elevator.Orders[a][BT_HallUp].Timestamp)
+			fmt.Println("timestamp that will be broadcasted after clear(cab): ", elevator.Orders[a][BT_Cab].Timestamp)
+			elevStateTx <- *elevator  //this SHOULD sed over data with new time stamps before door_timer
 
 		case <-doorTimer.C:
 
@@ -135,7 +140,7 @@ func fsm(elevator *Elevator,
 }
 
 func fsm_hallRequestAssigner(elevator *Elevator,
-	elevators map[string]Elevator,
+	elevators map[string]*Elevator,
 	id string,
 	hallRequests [][2]bool,
 	cabRequests []bool,
@@ -144,7 +149,7 @@ func fsm_hallRequestAssigner(elevator *Elevator,
 
 	hallRequestLock.Lock()
 	//elevStateTx <- *elevator  //kanksje alt vi trenger å gjøre for å broadcaste vår state
-	elevators[id] = *elevator
+	elevators[id] = elevator
 
 	for i := 0; i < NumFloors; i++ {
 		hallRequests[i][0] = elevator.Orders[i][0].State
@@ -206,30 +211,37 @@ func fsm_hallRequestAssigner(elevator *Elevator,
 		fmt.Println("peerID: ", peerID)
 		assignedID, _ := strconv.Atoi(peerID)
 		fmt.Println("assignedID: ", assignedID)
-		for i_id, elev := range elevators {
+		for i_id := range elevators {
 			for f := 0; f < NumFloors; f++ {
-				elev.Orders[f][0].State = newRequests[f][0]
-				elev.Orders[f][1].State = newRequests[f][1]
-
+				//elevators[i_id].Orders[f][0].State = newRequests[f][0]
+				//elevators[i_id].Orders[f][0].Timestamp = time.Now()
+				//elevators[i_id].Orders[f][1].State = newRequests[f][1]
+				//elevators[i_id].Orders[f][1].Timestamp = time.Now()
+				
 				if newRequests[f][0] {
 					fmt.Println("if happened")
 					fmt.Println("assignedID: ", assignedID)
-					elev.Orders[f][0].ElevatorID = assignedID
-					fmt.Println("the actual ID of elev now:", elev.Orders[f][0].ElevatorID)
+					elevators[i_id].Orders[f][0].ElevatorID = assignedID
+					elevators[i_id].Orders[f][0].Timestamp = time.Now()
+					//is it enough to only change the timestaps if the if's happens
+					//fmt.Println("the actual ID of elev now:", elevators[i_id].Orders[f][0].ElevatorID)
 				}
 				if newRequests[f][1] {
 					fmt.Println("if 2 happened")
 					fmt.Println("assignedID: ", assignedID)
-					elev.Orders[f][1].ElevatorID = assignedID
+					elevators[i_id].Orders[f][1].ElevatorID = assignedID
+					elevators[i_id].Orders[f][1].Timestamp = time.Now()
 				}
+
+				//update timestamp in the end?
 			}
 			// Important: Reassign modified struct back into the map
-			elevators[i_id] = elev
+			
 		}
 		//er cab calls det de skal være nå?
 		elevator.Orders = elevators[id].Orders
 	}
-	fmt.Printf("%+v\n", elevator.Orders) //!! her burde det være endringer
+	fmt.Printf("Orders after hra: %+v\n", elevator.Orders) //!!her burde det være endringer
 
 	elevStateTx <- *elevator
 
