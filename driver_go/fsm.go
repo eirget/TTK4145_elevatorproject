@@ -92,9 +92,7 @@ func fsm(elevator *Elevator,
 			}
 
 			//new_order_flag = true    //correct to have this inside if?
-			fmt.Println("timestamp that will be broadcasted after clear(hall_down): ", elevator.Orders[a][BT_HallDown].Timestamp)
-			fmt.Println("timestamp that will be broadcasted after clear(hall up): ", elevator.Orders[a][BT_HallUp].Timestamp)
-			fmt.Println("timestamp that will be broadcasted after clear(cab): ", elevator.Orders[a][BT_Cab].Timestamp)
+			
 			elevStateTx <- *elevator  //this SHOULD sed over data with new time stamps before door_timer
 
 		case <-doorTimer.C:
@@ -112,7 +110,15 @@ func fsm(elevator *Elevator,
 
 				fmt.Println("Resuming movement...")
 				fmt.Println("Resuming with Orders:")
-				fmt.Printf("%+v\n", elevator.Orders)
+				for f := 0; f < NumFloors; f++ {
+					fmt.Printf("\n Floornr: %+v ", f)
+					for b := elevio.ButtonType(0); b < 3; b++ {
+						fmt.Printf("%+v ", elevator.Orders[f][b].State)
+						fmt.Printf("%+v ", elevator.Orders[f][b].ElevatorID)
+					}
+					
+				}
+				fmt.Printf("\n")
 			}
 
 		case a := <-obstr_chan:
@@ -191,7 +197,6 @@ func fsm_hallRequestAssigner(elevator *Elevator,
 		return
 	}
 
-	fmt.Println("Raw HRA output: ", string(ret))
 
 	hallRequestLock.Lock()
 
@@ -208,9 +213,7 @@ func fsm_hallRequestAssigner(elevator *Elevator,
 	}
 
 	for peerID, newRequests := range *output {
-		fmt.Println("peerID: ", peerID)
 		assignedID, _ := strconv.Atoi(peerID)
-		fmt.Println("assignedID: ", assignedID)
 		for i_id := range elevators {
 			for f := 0; f < NumFloors; f++ {
 				//elevators[i_id].Orders[f][0].State = newRequests[f][0]
@@ -219,16 +222,12 @@ func fsm_hallRequestAssigner(elevator *Elevator,
 				//elevators[i_id].Orders[f][1].Timestamp = time.Now()
 				
 				if newRequests[f][0] {
-					fmt.Println("if happened")
-					fmt.Println("assignedID: ", assignedID)
 					elevators[i_id].Orders[f][0].ElevatorID = assignedID
 					elevators[i_id].Orders[f][0].Timestamp = time.Now()
 					//is it enough to only change the timestaps if the if's happens
 					//fmt.Println("the actual ID of elev now:", elevators[i_id].Orders[f][0].ElevatorID)
 				}
 				if newRequests[f][1] {
-					fmt.Println("if 2 happened")
-					fmt.Println("assignedID: ", assignedID)
 					elevators[i_id].Orders[f][1].ElevatorID = assignedID
 					elevators[i_id].Orders[f][1].Timestamp = time.Now()
 				}
@@ -241,7 +240,7 @@ func fsm_hallRequestAssigner(elevator *Elevator,
 		//er cab calls det de skal være nå?
 		elevator.Orders = elevators[id].Orders
 	}
-	fmt.Printf("Orders after hra: %+v\n", elevator.Orders) //!!her burde det være endringer
+	//fmt.Printf("Orders after hra: %+v\n", elevator.Orders) //!!her burde det være endringer
 
 	elevStateTx <- *elevator
 

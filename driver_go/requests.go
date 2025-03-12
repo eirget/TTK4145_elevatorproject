@@ -2,7 +2,6 @@ package main
 
 import (
 	"Driver_go/elevio"
-	"fmt"
 	"time"
 )
 
@@ -100,7 +99,7 @@ func (e *Elevator) shouldStop() bool {
 
 // clearAtCurrentFloor clears requests at the current floor.
 func (e *Elevator) clearAtCurrentFloor() {
-	fmt.Printf("Before Clearing: Orders at Floor %d: %+v\n", e.Floor_nr, e.Orders[e.Floor_nr])
+	//fmt.Printf("Before Clearing: Orders at Floor %d: %+v\n", e.Floor_nr, e.Orders[e.Floor_nr])
 
 	switch e.Config.ClearRequestVariant {
 	case CV_All:
@@ -110,38 +109,38 @@ func (e *Elevator) clearAtCurrentFloor() {
 			}
 		}
 	case CV_InDirn:
-		fmt.Println("Clearing CAB order at Floor", e.Floor_nr)
+		//fmt.Println("Clearing CAB order at Floor", e.Floor_nr)
 		e.Orders[e.Floor_nr][BT_Cab].State = false
 		e.Orders[e.Floor_nr][BT_Cab].Timestamp = time.Now()
 		elevio.SetButtonLamp(BT_Cab, e.Floor_nr, false)
 
 		switch e.Direction {
 		case elevio.MD_Up:
-			fmt.Println("Clearing HallUp at Floor", e.Floor_nr)
+			//fmt.Println("Clearing HallUp at Floor", e.Floor_nr)
 			e.Orders[e.Floor_nr][BT_HallUp].State = false
 			e.Orders[e.Floor_nr][BT_HallUp].Timestamp = time.Now()
 			elevio.SetButtonLamp(BT_HallUp, e.Floor_nr, false)
 
 			if !e.requestsAbove() {
-				fmt.Println("Clearing HallDown at Floor", e.Floor_nr)
+				//fmt.Println("Clearing HallDown at Floor", e.Floor_nr)
 				e.Orders[e.Floor_nr][BT_HallDown].State = false
 				e.Orders[e.Floor_nr][BT_HallDown].Timestamp = time.Now()
 				elevio.SetButtonLamp(BT_HallDown, e.Floor_nr, false)
 			}
 		case elevio.MD_Down:
-			fmt.Println("Clearing HallDown at Floor", e.Floor_nr)
+			//fmt.Println("Clearing HallDown at Floor", e.Floor_nr)
 			e.Orders[e.Floor_nr][BT_HallDown].State = false
 			e.Orders[e.Floor_nr][BT_HallDown].Timestamp = time.Now()
 			elevio.SetButtonLamp(BT_HallDown, e.Floor_nr, false)
 
 			if !e.requestsBelow() {
-				fmt.Println("Clearing HallUp at Floor", e.Floor_nr)
+				//fmt.Println("Clearing HallUp at Floor", e.Floor_nr)
 				e.Orders[e.Floor_nr][BT_HallUp].State = false
 				e.Orders[e.Floor_nr][BT_HallUp].Timestamp = time.Now()
 				elevio.SetButtonLamp(BT_HallUp, e.Floor_nr, false)
 			}
 		case elevio.MD_Stop:
-			fmt.Println("Clearing HallUp and HallDown at Floor", e.Floor_nr)
+			//fmt.Println("Clearing HallUp and HallDown at Floor", e.Floor_nr)
 			e.Orders[e.Floor_nr][BT_HallUp].State = false
 			e.Orders[e.Floor_nr][BT_HallUp].Timestamp = time.Now()
 			e.Orders[e.Floor_nr][BT_HallDown].State = false
@@ -151,5 +150,5 @@ func (e *Elevator) clearAtCurrentFloor() {
 		}
 	}
 
-	fmt.Printf("After Clearing: Orders at Floor %d: %+v\n", e.Floor_nr, e.Orders[e.Floor_nr])
+	//fmt.Printf("After Clearing: Orders at Floor %d: %+v\n", e.Floor_nr, e.Orders[e.Floor_nr])
 }

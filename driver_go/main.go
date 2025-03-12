@@ -61,6 +61,8 @@ func main() {
 	elevStateTx := make(chan Elevator)
 	elevStateRx := make(chan Elevator)
 
+
+
 	go peers.Transmitter(15622, id, peerTxEnable)
 	go peers.Receiver(15622, peerUpdateCh)
 
@@ -73,6 +75,7 @@ func main() {
 	go bcast.Transmitter(20032, run_hra)
 	go bcast.Receiver(20032, receive_run_hra)
 
+
 	addr := "localhost:" + port
 	elevio.Init(addr, NumFloors) //gjør til et flag
 
@@ -84,10 +87,12 @@ func main() {
 	drv_obstr := make(chan bool)
 	drv_stop := make(chan bool)
 
+
 	go elevio.PollButtons(drv_buttons)
 	go elevio.PollFloorSensor(drv_floors)
 	go elevio.PollObstructionSwitch(drv_obstr)
 	go elevio.PollStopButton(drv_stop)
+
 
 	for f := 0; f < NumFloors; f++ {
 		for b := elevio.ButtonType(0); b < 3; b++ {
@@ -97,11 +102,13 @@ func main() {
 	elevio.SetDoorOpenLamp(false)
 	elevio.SetStopLamp(false)
 
+
 	a := <-drv_floors
 	for a == -1 {
 		elevio.SetMotorDirection(d)
 	}
 	elevio.SetMotorDirection(elevio.MD_Stop)
+
 
 	id_num, _ := strconv.Atoi(id)
 	elevator := ElevatorInit(a, id_num) //kanskje det blir penere å bare bruke string
@@ -144,9 +151,9 @@ func main() {
 
 			fmt.Printf("Recieved: \n")
 			fmt.Printf("Message from ID: %v\n", a.Orders[1][2].ElevatorID)
-			fmt.Printf("Floor_nr: %v\n", a.Floor_nr)
-			fmt.Printf("Direction %v\n", a.Direction)
-			fmt.Println("timestamp(hall up): \n", a.Orders[a.Floor_nr][BT_HallUp].Timestamp)
+			//fmt.Printf("Floor_nr: %v\n", a.Floor_nr)
+			//fmt.Printf("Direction %v\n", a.Direction)
+			//fmt.Println("timestamp(hall up): \n", a.Orders[a.Floor_nr][BT_HallUp].Timestamp)
 
 			//NEW, idea for fixing when hall requests should actually be updated
 			//func updateHallRequests(myElevator *Elevator, receivedElev Elevator) {
@@ -160,6 +167,16 @@ func main() {
 					}
 				}
 			//}
+
+			for f := 0; f < NumFloors; f++ {
+				fmt.Printf("\n Floornr: %+v ", f)
+				for b := elevio.ButtonType(0); b < 3; b++ {
+					fmt.Printf("%+v ", a.Orders[f][b].State)
+					fmt.Printf("%+v ", a.Orders[f][b].ElevatorID)
+				}
+				
+			}
+			fmt.Printf("\n")
 			
 			
 			if new_order_flag {
