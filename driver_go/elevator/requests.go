@@ -1,13 +1,14 @@
-package main
+package elevator
 
 import (
+	"Driver_go/config"
 	"Driver_go/elevio"
 	"time"
 )
 
 func (e *Elevator) requestsAbove() bool {
-	for f := e.Floor_nr + 1; f < NumFloors; f++ { //blir "+1" feil, er nok riktig
-		for btn := 0; btn < NumButtons; btn++ {
+	for f := e.Floor_nr + 1; f < config.NumFloors; f++ { //blir "+1" feil, er nok riktig
+		for btn := 0; btn < config.NumButtons; btn++ {
 			if e.Orders[f][btn].State && e.Orders[f][btn].ElevatorID == e.ID {
 				return true
 			}
@@ -19,7 +20,7 @@ func (e *Elevator) requestsAbove() bool {
 // requestsBelow checks for requests below the current floor.
 func (e *Elevator) requestsBelow() bool {
 	for f := 0; f < e.Floor_nr; f++ {
-		for btn := 0; btn < NumButtons; btn++ {
+		for btn := 0; btn < config.NumButtons; btn++ {
 			if e.Orders[f][btn].State && e.Orders[f][btn].ElevatorID == e.ID {
 				return true
 			}
@@ -30,7 +31,7 @@ func (e *Elevator) requestsBelow() bool {
 
 // requestsHere checks for requests at the current floor.
 func (e *Elevator) requestsHere() bool {
-	for btn := 0; btn < NumButtons; btn++ {
+	for btn := 0; btn < config.NumButtons; btn++ {
 		if e.Orders[e.Floor_nr][btn].State && e.Orders[e.Floor_nr][btn].ElevatorID == e.ID {
 			return true
 		}
@@ -39,7 +40,7 @@ func (e *Elevator) requestsHere() bool {
 }
 
 // chooseDirection decides the next direction based on the requests.
-func (e *Elevator) chooseDirection() (elevio.MotorDirection, ElevatorBehavior) {
+func (e *Elevator) ChooseDirection() (elevio.MotorDirection, ElevatorBehavior) {
 	switch e.Direction {
 	case elevio.MD_Up:
 		if e.requestsAbove() {
@@ -80,7 +81,7 @@ func (e *Elevator) chooseDirection() (elevio.MotorDirection, ElevatorBehavior) {
 }
 
 // shouldStop checks if the elevator should stop at the current floor.
-func (e *Elevator) shouldStop() bool {
+func (e *Elevator) ShouldStop() bool {
 	switch e.Direction {
 	case elevio.MD_Down:
 		return (e.Orders[e.Floor_nr][BT_HallDown].State && e.Orders[e.Floor_nr][BT_HallDown].ElevatorID == e.ID) ||
@@ -98,12 +99,12 @@ func (e *Elevator) shouldStop() bool {
 }
 
 // clearAtCurrentFloor clears requests at the current floor.
-func (e *Elevator) clearAtCurrentFloor() {
+func (e *Elevator) ClearAtCurrentFloor() {
 	//fmt.Printf("Before Clearing: Orders at Floor %d: %+v\n", e.Floor_nr, e.Orders[e.Floor_nr])
 
 	switch e.Config.ClearRequestVariant {
 	case CV_All:
-		for btn := 0; btn < NumButtons; btn++ {
+		for btn := 0; btn < config.NumButtons; btn++ {
 			if e.Orders[e.Floor_nr][btn].ElevatorID == e.ID {
 				e.Orders[e.Floor_nr][btn].State = false
 			}

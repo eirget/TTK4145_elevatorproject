@@ -1,4 +1,4 @@
-package main
+package elevator
 
 import (
 	"Driver_go/elevio"
@@ -38,13 +38,13 @@ type Elevator struct {
 	Config      Config
 }
 
-var directionMap = map[elevio.MotorDirection]string{
+var DirectionMap = map[elevio.MotorDirection]string{
 	elevio.MD_Up:   "up",
 	elevio.MD_Down: "down",
 	elevio.MD_Stop: "stop",
 }
 
-var behaviorMap = map[ElevatorBehavior]string{
+var BehaviorMap = map[ElevatorBehavior]string{
 	EB_Idle:     "idle",
 	EB_DoorOpen: "doorOpen",
 	EB_Moving:   "moving",
