@@ -5,6 +5,7 @@ import (
 	"Driver_go/elevator"
 	"Driver_go/elevio"
 	"Driver_go/network"
+	"Driver_go/network/peers"
 	"flag"
 	"fmt"
 	"strconv"
@@ -13,9 +14,21 @@ import (
 
 //tested to obstruct the closest elevator to a call, the available elevator did not take over the order
 
-func main() {
+func monitorElevatorActivity(elevators map[string]*elevator.Elevator, runHra chan bool) {
+	ticker := time.NewTicker(5 * time.Second) // Check every 5 seconds
+	defer ticker.Stop()
 
-	//NETWORK
+	for range ticker.C {
+		for id, elev := range elevators {
+			if time.Since(elev.LastActive) > 5*time.Second { // Elevator inactive for 5+ seconds
+				fmt.Println("Elevator", id, "is inactive! Reassigning orders...")
+				runHra <- true // Trigger hall request reassignment
+			}
+		}
+	}
+}
+
+func main() {
 
 	hraExecutable := "hall_request_assigner"
 
@@ -29,74 +42,49 @@ func main() {
 	hallRequests := make([][2]bool, config.NumFloors)
 	cabRequests := make([]bool, config.NumFloors)
 
-	peerUpdateCh, elevStateTx, elevStateRx, run_hra, receive_run_hra := network.NetworkInit(id)
-
 	//create map to store elevator states for all elevators on system, !!! point to discuss: *Elevator or not?
 	elevators := make(map[string]*elevator.Elevator)
-
-	fmt.Printf("%+v\n", elevators)
 
 	addr := "localhost:" + port
 	elevio.Init(addr, config.NumFloors) //gjør til et flag
 
-	var d elevio.MotorDirection = elevio.MD_Up
-	//
-
-	fmt.Printf("Before go routines \n")
+	//fmt.Printf("Before go routines \n")
 
 	drv_buttons := make(chan elevio.ButtonEvent)
 	drv_floors := make(chan int)
 	drv_obstr := make(chan bool)
 	drv_stop := make(chan bool)
 
-	go elevio.PollButtons(drv_buttons)
-	go elevio.PollFloorSensor(drv_floors)
-	go elevio.PollObstructionSwitch(drv_obstr)
-	go elevio.PollStopButton(drv_stop)
+	elevio.ElevioInit(drv_buttons, drv_floors, drv_obstr, drv_stop)
 
-	for f := 0; f < config.NumFloors; f++ {
-		for b := elevio.ButtonType(0); b < 3; b++ {
-			elevio.SetButtonLamp(b, f, false)
-		}
-	}
-	elevio.SetDoorOpenLamp(false)
-	elevio.SetStopLamp(false)
+	//make a channel for receiving updates on the id's of the peers that are alive on the network
+	peerUpdateCh := make(chan peers.PeerUpdate)
+	//we can enable/disable the transmitter after it has been started, coulb be used to signal that we are unavailable
+	peerTxEnable := make(chan bool)
+	//we make channels for sending and receiving our custom data types
+	elevStateTx := make(chan elevator.Elevator)
+	elevStateRx := make(chan elevator.Elevator)
 
-	//this go routine is made to make the code work when the elvator is initalized between floors. For this we need a new chan (floorChan) because using drv_floors might cause race conditions
-	floorChan := make(chan int)
+	runHra := make(chan bool, 10)
+	receiveRunHra := make(chan bool, 10)
 
-	go func() {
-		elevio.SetMotorDirection(d)
+	network.NetworkInit(id, peerUpdateCh, peerTxEnable, elevStateTx, elevStateRx, runHra, receiveRunHra)
 
-		for {
-			select {
-			case a := <-drv_floors:
-				if a != -1 {
-					fmt.Println("Started at floor: ", a)
-					elevio.SetMotorDirection(elevio.MD_Stop)
-					floorChan <- a
-					return
-				}
-			case <-time.After(500 * time.Millisecond):
-				fmt.Println("Waiting for valid floor signal...")
-			}
-		}
-		
-	}()
-	a := <-floorChan
+	a := elevio.WaitForValidFloor(elevio.MD_Up, drv_floors)
+	fmt.Println("Elevator initialized at floor:", a)
 	fmt.Println("Elevator initalized at floor: ", a)
-
 
 	id_num, _ := strconv.Atoi(id)
 	elevator := elevator.ElevatorInit(a, id_num) //kanskje det blir penere å bare bruke string
-
 
 	elevStateTx <- *elevator
 
 	elevio.SetFloorIndicator(elevator.Floor_nr)
 
-	go fsm(elevator, elevStateTx, drv_buttons, drv_floors, drv_obstr, drv_stop, config.NumFloors)
+	go fsm(elevator, elevStateTx, drv_buttons, drv_floors, drv_obstr, drv_stop, config.NumFloors, runHra)
 	//go hraSignalListener(elevator, elevators, id, hallRequests, cabRequests, hraExecutable, elevStateTx, run_hra)
+
+	go monitorElevatorActivity(elevators, runHra)
 
 	//non-blocking timer
 	hraTimer := time.NewTimer(0)
@@ -158,7 +146,7 @@ func main() {
 			fmt.Printf("Timestamp: %v \n", time.Now())
 
 			if new_order_flag {
-				run_hra <- true
+				runHra <- true
 				new_order_flag = false
 			}
 
@@ -166,7 +154,7 @@ func main() {
 
 			//fmt.Printf("%+v\n", elevators)
 
-		case <-receive_run_hra:
+		case <-receiveRunHra:
 			go hallRequestAssigner(elevator, elevators, id, hallRequests, cabRequests, hraExecutable, elevStateRx)
 
 			//might not be neccessary at all

@@ -2,9 +2,7 @@ package elevator
 
 import (
 	"Driver_go/config"
-	"Driver_go/elevator"
 	"Driver_go/elevio"
-	"fmt"
 	"time"
 )
 
@@ -115,32 +113,27 @@ func (e *Elevator) ClearAtCurrentFloor() {
 		//fmt.Println("Clearing CAB order at Floor", e.Floor_nr)
 		e.Orders[e.Floor_nr][BT_Cab].State = false
 		e.Orders[e.Floor_nr][BT_Cab].Timestamp = time.Now()
-		elevio.SetButtonLamp(BT_Cab, e.Floor_nr, false)
 
 		switch e.Direction {
 		case elevio.MD_Up:
 			//fmt.Println("Clearing HallUp at Floor", e.Floor_nr)
 			e.Orders[e.Floor_nr][BT_HallUp].State = false
 			e.Orders[e.Floor_nr][BT_HallUp].Timestamp = time.Now()
-			elevio.SetButtonLamp(BT_HallUp, e.Floor_nr, false)
 
 			if !e.requestsAbove() {
 				//fmt.Println("Clearing HallDown at Floor", e.Floor_nr)
 				e.Orders[e.Floor_nr][BT_HallDown].State = false
 				e.Orders[e.Floor_nr][BT_HallDown].Timestamp = time.Now()
-				elevio.SetButtonLamp(BT_HallDown, e.Floor_nr, false)
 			}
 		case elevio.MD_Down:
 			//fmt.Println("Clearing HallDown at Floor", e.Floor_nr)
 			e.Orders[e.Floor_nr][BT_HallDown].State = false
 			e.Orders[e.Floor_nr][BT_HallDown].Timestamp = time.Now()
-			elevio.SetButtonLamp(BT_HallDown, e.Floor_nr, false)
 
 			if !e.requestsBelow() {
 				//fmt.Println("Clearing HallUp at Floor", e.Floor_nr)
 				e.Orders[e.Floor_nr][BT_HallUp].State = false
 				e.Orders[e.Floor_nr][BT_HallUp].Timestamp = time.Now()
-				elevio.SetButtonLamp(BT_HallUp, e.Floor_nr, false)
 			}
 		case elevio.MD_Stop:
 			//fmt.Println("Clearing HallUp and HallDown at Floor", e.Floor_nr)
@@ -148,16 +141,15 @@ func (e *Elevator) ClearAtCurrentFloor() {
 			e.Orders[e.Floor_nr][BT_HallUp].Timestamp = time.Now()
 			e.Orders[e.Floor_nr][BT_HallDown].State = false
 			e.Orders[e.Floor_nr][BT_HallDown].Timestamp = time.Now()
-			elevio.SetButtonLamp(BT_HallUp, e.Floor_nr, false)
-			elevio.SetButtonLamp(BT_HallDown, e.Floor_nr, false)
 		}
 	}
-
 	//fmt.Printf("After Clearing: Orders at Floor %d: %+v\n", e.Floor_nr, e.Orders[e.Floor_nr])
+	e.SetLights()
 }
 
-func ReassignOrders(elev elevator.Elevator) {
-	for f:= 0; f < config.NumFloors; f++ {
+/*
+func ReassignOrders(elev Elevator) {
+	for f := 0; f < config.NumFloors; f++ {
 		for b := 0; b < config.NumButtons; b++ {
 			if elev.Orders[f][b].State { //if theres an active order
 				AssignToAnotherElevator(f, b)
@@ -176,3 +168,4 @@ func AssignToAnotherElevator(floor int, button int) {
 		}
 	}
 }
+*/
