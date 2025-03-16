@@ -33,7 +33,7 @@ func fsm(elev *elevator.Elevator,
 			//elevators[id] = elevator
 			elev.Orders[a.Floor][a.Button].Timestamp = time.Now()
 			//unlock
-			fmt.Println("orders after button press: ", elev.Orders)
+			fmt.Println("orders after button press: ", elev.Orders) //this print hapened at a somewhat random time? when is it supposed to happen?
 
 			if a.Button == elevio.BT_Cab {
 				elevio.SetButtonLamp(a.Button, a.Floor, true)
@@ -92,6 +92,19 @@ func fsm(elev *elevator.Elevator,
 			if elev.Obstruction {
 				fmt.Println("Waiting for obstruction to clear...")
 				doorTimer.Reset(500 * time.Millisecond)
+
+				//unsure whether the following code should be here or in the obstr_chan case
+				// the following go routine might made just because we want a non-blocking timer, but code for this is already made in main.go line 101. Meaning the go routine might be unnessesary
+				go func() { //start a timer in a separate go routine
+					time.Sleep(2 * time.Second) //if obstruction is on for more than 2 seconds: reassign orders
+
+					if elev.Obstruction {
+						elevator.ReassignOrders(elev)
+					} else {
+						fmt.Println("Obstruction cleared")
+					}
+				}()
+				
 			} else {
 				elevio.SetDoorOpenLamp(false)
 				elev.Behavior = elevator.EB_Idle

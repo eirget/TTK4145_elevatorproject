@@ -11,6 +11,8 @@ import (
 	"time"
 )
 
+//tested to obstruct the closest elevator to a call, the available elevator did not take over the order
+
 func main() {
 
 	//NETWORK
@@ -40,6 +42,8 @@ func main() {
 	var d elevio.MotorDirection = elevio.MD_Up
 	//
 
+	fmt.Printf("Before go routines \n")
+
 	drv_buttons := make(chan elevio.ButtonEvent)
 	drv_floors := make(chan int)
 	drv_obstr := make(chan bool)
@@ -58,14 +62,34 @@ func main() {
 	elevio.SetDoorOpenLamp(false)
 	elevio.SetStopLamp(false)
 
-	a := <-drv_floors
-	for a == -1 {
+	//this go routine is made to make the code work when the elvator is initalized between floors. For this we need a new chan (floorChan) because using drv_floors might cause race conditions
+	floorChan := make(chan int)
+
+	go func() {
 		elevio.SetMotorDirection(d)
-	}
-	elevio.SetMotorDirection(elevio.MD_Stop)
+
+		for {
+			select {
+			case a := <-drv_floors:
+				if a != -1 {
+					fmt.Println("Started at floor: ", a)
+					elevio.SetMotorDirection(elevio.MD_Stop)
+					floorChan <- a
+					return
+				}
+			case <-time.After(500 * time.Millisecond):
+				fmt.Println("Waiting for valid floor signal...")
+			}
+		}
+		
+	}()
+	a := <-floorChan
+	fmt.Println("Elevator initalized at floor: ", a)
+
 
 	id_num, _ := strconv.Atoi(id)
 	elevator := elevator.ElevatorInit(a, id_num) //kanskje det blir penere å bare bruke string
+
 
 	elevStateTx <- *elevator
 
@@ -126,11 +150,12 @@ func main() {
 				fmt.Printf("\n Floornr: %+v ", f)
 				for b := elevio.ButtonType(0); b < 3; b++ {
 					fmt.Printf("%+v ", a.Orders[f][b].State)
-					fmt.Printf("%+v ", a.Orders[f][b].ElevatorID)
+					fmt.Printf("%+v, ", a.Orders[f][b].ElevatorID)
 				}
 
 			}
 			fmt.Printf("\n")
+			fmt.Printf("Timestamp: %v \n", time.Now())
 
 			if new_order_flag {
 				run_hra <- true

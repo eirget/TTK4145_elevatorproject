@@ -2,7 +2,9 @@ package elevator
 
 import (
 	"Driver_go/config"
+	"Driver_go/elevator"
 	"Driver_go/elevio"
+	"fmt"
 	"time"
 )
 
@@ -152,4 +154,25 @@ func (e *Elevator) ClearAtCurrentFloor() {
 	}
 
 	//fmt.Printf("After Clearing: Orders at Floor %d: %+v\n", e.Floor_nr, e.Orders[e.Floor_nr])
+}
+
+func ReassignOrders(elev elevator.Elevator) {
+	for f:= 0; f < config.NumFloors; f++ {
+		for b := 0; b < config.NumButtons; b++ {
+			if elev.Orders[f][b].State { //if theres an active order
+				AssignToAnotherElevator(f, b)
+				elev.Orders[f][b].State = false
+			}
+		}
+	}
+}
+
+func AssignToAnotherElevator(floor int, button int) {
+	for id, otherElev := range main.elevators { //must get the elevators map from main
+		if !otherElev.Obstruction { //find an available elevator
+			otherElev.Orders[floor][button].State = true
+			fmt.Printf("Reassigned order on floor %d to elevator %s \n", floor, id)
+			return
+		}
+	}
 }
