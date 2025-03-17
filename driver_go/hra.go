@@ -33,6 +33,8 @@ func hallRequestAssigner(elev *elevator.Elevator,
 	hraExecutable string,
 	elevStateTx chan elevator.Elevator) {
 
+	fmt.Printf("HRA started1\n")
+
 	hallRequestLock.Lock()
 	elevators[id] = elev
 
@@ -62,6 +64,7 @@ func hallRequestAssigner(elev *elevator.Elevator,
 		}
 	}
 
+	
 	hallRequestLock.Unlock()
 
 	jsonBytes, err := json.Marshal(input)
@@ -79,6 +82,9 @@ func hallRequestAssigner(elev *elevator.Elevator,
 
 	// Process the output and update orders
 	hallRequestLock.Lock()
+
+	//output er tom, så når den oppdateres blir den kun fylt med false states vi må altså somehow sørge for at det som står i output er det samme som står i elevator
+
 	output := new(map[string][][2]bool)
 	err = json.Unmarshal(ret, &output)
 	if err != nil {
@@ -86,22 +92,28 @@ func hallRequestAssigner(elev *elevator.Elevator,
 		return
 	}
 
+
+	
 	for peerID, newRequests := range *output {
 		assignedID, _ := strconv.Atoi(peerID)
 		for i_id := range activeElevators {
 			for f := 0; f < config.NumFloors; f++ {
+				// feilen er at denne alrdri blir true fordi newRequests ikke oppdateres riktig 
 				if newRequests[f][0] {
+					fmt.Printf("if 1 happened")
 					activeElevators[i_id].Orders[f][0].ElevatorID = assignedID
 					activeElevators[i_id].Orders[f][0].Timestamp = time.Now()
 				}
 				if newRequests[f][1] {
+					fmt.Printf("if 2 happened")
 					activeElevators[i_id].Orders[f][1].ElevatorID = assignedID
 					activeElevators[i_id].Orders[f][1].Timestamp = time.Now()
 				}
 			}
 		}
+		elev.Orders = activeElevators[id].Orders
 	}
-
+	
 	// Notify FSM
 	elevStateTx <- *elev
 	hallRequestLock.Unlock()

@@ -24,7 +24,7 @@ func fsm(elev *elevator.Elevator,
 	for {
 		select {
 		case a := <-req_chan:
-			handleRequestButtonPress(a, elev, elevStateTx)
+			handleRequestButtonPress(a, elev, elevStateTx, &new_order_flag)
 
 		case <-time.After(100 * time.Millisecond):
 			handleIdleState(elev, doorTimer)
@@ -47,18 +47,20 @@ func fsm(elev *elevator.Elevator,
 	}
 }
 
-func handleRequestButtonPress(a elevio.ButtonEvent, elev *elevator.Elevator, elevStateTx chan elevator.Elevator) {
+func handleRequestButtonPress(a elevio.ButtonEvent, elev *elevator.Elevator, elevStateTx chan elevator.Elevator, new_order_flag *bool) {
 	fmt.Printf("%+v\n", a)
 	elev.Orders[a.Floor][a.Button].State = true
 	elev.Orders[a.Floor][a.Button].Timestamp = time.Now()
+
+	elevStateTx <- *elev
 
 	fmt.Println("orders after button press: ", elev.Orders)
 
 	if a.Button == elevio.BT_Cab {
 		elevio.SetButtonLamp(a.Button, a.Floor, true)
 	}
-	new_order_flag = true
-	elevStateTx <- *elev
+	*new_order_flag = true
+	//elevStateTx <- *elev
 }
 
 func handleIdleState(elev *elevator.Elevator, doorTimer *time.Timer) {

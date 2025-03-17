@@ -14,17 +14,23 @@ import (
 
 //tested to obstruct the closest elevator to a call, the available elevator did not take over the order
 
-func monitorElevatorActivity(elevators map[string]*elevator.Elevator, runHra chan bool) {
-	ticker := time.NewTicker(5 * time.Second) // Check every 5 seconds
+func monitorElevatorActivity(elevator *elevator.Elevator, runHra chan bool) {
+	ticker := time.NewTicker(1 * time.Second) // Check every 5 seconds
 	defer ticker.Stop()
-
+	// need to double check with some sort of "heartbeat" if it actually doesnt work, update lastActive if nothing is wrong
 	for range ticker.C {
-		for id, elev := range elevators {
-			if time.Since(elev.LastActive) > 5*time.Second { // Elevator inactive for 5+ seconds
-				fmt.Println("Elevator", id, "is inactive! Reassigning orders...")
-				runHra <- true // Trigger hall request reassignment
+		if time.Since(elevator.LastActive) > 5*time.Second { // Elevator inactive for 5+ seconds
+			for f := 0; f < config.NumFloors; f++ {
+				for b := 0; b < config.NumButtons-1; b++ { // Only HallUp and HallDown
+					// Compare timestamps to ensure only newer updates are accepted
+					if elevator.Orders[f][b].State {	
+						fmt.Println("I am inactive! Reassigning my orders...")
+						runHra <- true // Trigger hall request reassignment
+						return
+					}
+				}
 			}
-		}
+		}		
 	}
 }
 
@@ -84,12 +90,8 @@ func main() {
 	go fsm(elevator, elevStateTx, drv_buttons, drv_floors, drv_obstr, drv_stop, config.NumFloors, runHra)
 	//go hraSignalListener(elevator, elevators, id, hallRequests, cabRequests, hraExecutable, elevStateTx, run_hra)
 
-	go monitorElevatorActivity(elevators, runHra)
+	go monitorElevatorActivity(elevator, runHra)
 
-	//non-blocking timer
-	hraTimer := time.NewTimer(0)
-	<-hraTimer.C
-	hraTimer.Reset(1 * time.Second)
 
 	fmt.Printf("Started elevator system \n")
 
