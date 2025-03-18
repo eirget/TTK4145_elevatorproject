@@ -23,14 +23,14 @@ func monitorElevatorActivity(elevator *elevator.Elevator, runHra chan bool) {
 			for f := 0; f < config.NumFloors; f++ {
 				for b := 0; b < config.NumButtons-1; b++ { // Only HallUp and HallDown
 					// Compare timestamps to ensure only newer updates are accepted
-					if elevator.Orders[f][b].State {	
+					if elevator.Orders[f][b].State {
 						fmt.Println("I am inactive! Reassigning my orders...")
 						runHra <- true // Trigger hall request reassignment
 						return
 					}
 				}
 			}
-		}		
+		}
 	}
 }
 
@@ -91,7 +91,6 @@ func main() {
 	//go hraSignalListener(elevator, elevators, id, hallRequests, cabRequests, hraExecutable, elevStateTx, run_hra)
 
 	go monitorElevatorActivity(elevator, runHra)
-
 
 	fmt.Printf("Started elevator system \n")
 
@@ -157,6 +156,7 @@ func main() {
 			//fmt.Printf("%+v\n", elevators)
 
 		case <-receiveRunHra:
+			fmt.Println("Received runHra signal")
 			go hallRequestAssigner(elevator, elevators, id, hallRequests, cabRequests, hraExecutable, elevStateRx)
 
 			//might not be neccessary at all
