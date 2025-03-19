@@ -119,32 +119,52 @@ func (e *Elevator) ClearAtCurrentFloor() {
 			//fmt.Println("Clearing HallUp at Floor", e.Floor_nr)
 			e.Orders[e.Floor_nr][BT_HallUp].State = false
 			e.Orders[e.Floor_nr][BT_HallUp].Timestamp = time.Now()
+			e.Orders[e.Floor_nr][BT_HallUp].ElevatorID = 100
 
 			if !e.requestsAbove() {
 				//fmt.Println("Clearing HallDown at Floor", e.Floor_nr)
 				e.Orders[e.Floor_nr][BT_HallDown].State = false
 				e.Orders[e.Floor_nr][BT_HallDown].Timestamp = time.Now()
+				e.Orders[e.Floor_nr][BT_HallDown].ElevatorID = 100
 			}
 		case elevio.MD_Down:
 			//fmt.Println("Clearing HallDown at Floor", e.Floor_nr)
 			e.Orders[e.Floor_nr][BT_HallDown].State = false
 			e.Orders[e.Floor_nr][BT_HallDown].Timestamp = time.Now()
+			e.Orders[e.Floor_nr][BT_HallDown].ElevatorID = 100
 
 			if !e.requestsBelow() {
 				//fmt.Println("Clearing HallUp at Floor", e.Floor_nr)
 				e.Orders[e.Floor_nr][BT_HallUp].State = false
 				e.Orders[e.Floor_nr][BT_HallUp].Timestamp = time.Now()
+				e.Orders[e.Floor_nr][BT_HallUp].ElevatorID = 100
 			}
 		case elevio.MD_Stop:
 			//fmt.Println("Clearing HallUp and HallDown at Floor", e.Floor_nr)
+
+			//HVIS DET ER BÅDE UP AND DOWN I SAMME ETASJE, bruk timestamp til å cleare den eldste av de, også bare gå tilbake til fsm
+			if e.Orders[e.Floor_nr][BT_HallDown].State && e.Orders[e.Floor_nr][BT_HallUp].State {
+				if e.Orders[e.Floor_nr][BT_HallDown].Timestamp.After(e.Orders[e.Floor_nr][BT_HallUp].Timestamp) {
+					e.Orders[e.Floor_nr][BT_HallUp].State = false
+					e.Orders[e.Floor_nr][BT_HallUp].Timestamp = time.Now()
+					e.Orders[e.Floor_nr][BT_HallUp].ElevatorID = 100
+					return
+				} else {
+					e.Orders[e.Floor_nr][BT_HallDown].State = false
+					e.Orders[e.Floor_nr][BT_HallDown].Timestamp = time.Now()
+					e.Orders[e.Floor_nr][BT_HallDown].ElevatorID = 100
+					return
+				}
+			}
 			e.Orders[e.Floor_nr][BT_HallUp].State = false
 			e.Orders[e.Floor_nr][BT_HallUp].Timestamp = time.Now()
+			e.Orders[e.Floor_nr][BT_HallUp].ElevatorID = 100
 			e.Orders[e.Floor_nr][BT_HallDown].State = false
 			e.Orders[e.Floor_nr][BT_HallDown].Timestamp = time.Now()
+			e.Orders[e.Floor_nr][BT_HallDown].ElevatorID = 100
 		}
 	}
 	//fmt.Printf("After Clearing: Orders at Floor %d: %+v\n", e.Floor_nr, e.Orders[e.Floor_nr])
-	e.SetLights()
 }
 
 /*

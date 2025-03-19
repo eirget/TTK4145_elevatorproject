@@ -134,17 +134,23 @@ func (e *Elevator) CloseDoorAndResume() {
 
 func (e *Elevator) SetLights() {
 	for f := 0; f < config.NumFloors; f++ {
-		for b := elevio.ButtonType(0); b < config.NumButtons; b++ {
+		hallUp := e.Orders[f][BT_HallUp].State
+		hallDown := e.Orders[f][BT_HallDown].State
+		cab := e.Orders[f][BT_Cab].State
 
-			// Hall lights should be identical across all elevators
-			if b == BT_HallUp || b == BT_HallDown {
-				// Set the hall light ON/OFF based on the shared Orders array
-				elevio.SetButtonLamp(b, f, e.Orders[f][b].State)
+		elevio.SetButtonLamp(BT_HallUp, f, hallUp)
+		elevio.SetButtonLamp(BT_HallDown, f, hallDown)
+		elevio.SetButtonLamp(BT_Cab, f, cab)
+	}
+}
 
-				// Cab lights should be set based on each individual elevator's Orders
-			} else if b == BT_Cab {
-				elevio.SetButtonLamp(BT_Cab, f, e.Orders[f][BT_Cab].State)
+func (e *Elevator) HasPendingOrders() bool {
+	for f := 0; f < config.NumFloors; f++ {
+		for b := 0; b < config.NumButtons; b++ {
+			if e.Orders[f][b].State {
+				return true
 			}
 		}
 	}
+	return false
 }

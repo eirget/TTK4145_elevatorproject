@@ -2,7 +2,7 @@ package main
 
 import (
 	"Driver_go/config"
-	"Driver_go/elevator"
+	elev_import "Driver_go/elevator"
 	"Driver_go/elevio"
 	"Driver_go/network"
 	"Driver_go/network/peers"
@@ -14,21 +14,15 @@ import (
 
 //tested to obstruct the closest elevator to a call, the available elevator did not take over the order
 
-func monitorElevatorActivity(elevator *elevator.Elevator, runHra chan bool) {
-	ticker := time.NewTicker(1 * time.Second) // Check every 5 seconds
+func monitorElevatorActivity(elevator *elev_import.Elevator, runHra chan bool) {
+	ticker := time.NewTicker(1 * time.Second) // Check every second
 	defer ticker.Stop()
 	// need to double check with some sort of "heartbeat" if it actually doesnt work, update lastActive if nothing is wrong
 	for range ticker.C {
 		if time.Since(elevator.LastActive) > 5*time.Second { // Elevator inactive for 5+ seconds
-			for f := 0; f < config.NumFloors; f++ {
-				for b := 0; b < config.NumButtons-1; b++ { // Only HallUp and HallDown
-					// Compare timestamps to ensure only newer updates are accepted
-					if elevator.Orders[f][b].State {
-						fmt.Println("I am inactive! Reassigning my orders...")
-						runHra <- true // Trigger hall request reassignment
-						return
-					}
-				}
+			if elevator.HasPendingOrders(){
+				runHra <- true // Trigger hall request reassignment
+				return
 			}
 		}
 	}
@@ -49,7 +43,7 @@ func main() {
 	cabRequests := make([]bool, config.NumFloors)
 
 	//create map to store elevator states for all elevators on system, !!! point to discuss: *Elevator or not?
-	elevators := make(map[string]*elevator.Elevator)
+	elevators := make(map[string]*elev_import.Elevator)
 
 	addr := "localhost:" + port
 	elevio.Init(addr, config.NumFloors) //gjør til et flag
@@ -68,8 +62,8 @@ func main() {
 	//we can enable/disable the transmitter after it has been started, coulb be used to signal that we are unavailable
 	peerTxEnable := make(chan bool)
 	//we make channels for sending and receiving our custom data types
-	elevStateTx := make(chan elevator.Elevator)
-	elevStateRx := make(chan elevator.Elevator)
+	elevStateTx := make(chan elev_import.Elevator)
+	elevStateRx := make(chan elev_import.Elevator)
 
 	runHra := make(chan bool, 10)
 	receiveRunHra := make(chan bool, 10)
@@ -81,7 +75,7 @@ func main() {
 	fmt.Println("Elevator initalized at floor: ", a)
 
 	id_num, _ := strconv.Atoi(id)
-	elevator := elevator.ElevatorInit(a, id_num) //kanskje det blir penere å bare bruke string
+	elevator := elev_import.ElevatorInit(a, id_num) //kanskje det blir penere å bare bruke string
 
 	elevStateTx <- *elevator
 
@@ -113,8 +107,10 @@ func main() {
 		case a := <-elevStateRx: //kan hende denne vil miste orders om det blir fullt i buffer
 			//update elevator to have newest state of other elevators
 			idStr := strconv.Itoa(a.ID)
-
+			
 			elevators[idStr] = &a //may have to directly allocate new Elevator pointer
+			fmt.Printf("elevators: %v", elevators)
+		
 
 			fmt.Printf("Recieved: \n")
 			fmt.Printf("Message from ID: %v\n", a.Orders[1][2].ElevatorID)
@@ -146,6 +142,8 @@ func main() {
 			fmt.Printf("\n")
 			fmt.Printf("Timestamp: %v \n", time.Now())
 
+			elevator.SetLights()
+
 			if new_order_flag {
 				runHra <- true
 				new_order_flag = false
@@ -156,8 +154,18 @@ func main() {
 			//fmt.Printf("%+v\n", elevators)
 
 		case <-receiveRunHra:
+
+			//actually create logic that will be correct for all cases
 			fmt.Println("Received runHra signal")
-			go hallRequestAssigner(elevator, elevators, id, hallRequests, cabRequests, hraExecutable, elevStateRx)
+
+			activeElevators := make(map[string]*elev_import.Elevator)
+
+			for id, elev := range elevators  {
+				if time.Since(elev.LastActive) < 5*time.Second || !elev.HasPendingOrders() {
+					activeElevators[id] = elev
+				}
+			}
+			go hallRequestAssigner(elevator, activeElevators, id, hallRequests, cabRequests, hraExecutable, elevStateRx)
 
 			//might not be neccessary at all
 			//case <-time.After(500 * time.Millisecond):

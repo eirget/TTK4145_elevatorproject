@@ -24,22 +24,23 @@ func fsm(elev *elevator.Elevator,
 	for {
 		select {
 		case a := <-req_chan:
-			handleRequestButtonPress(a, elev, elevStateTx, &new_order_flag)
+			fsmHandleRequestButtonPress(a, elev, elevStateTx, &new_order_flag)
 
 		case <-time.After(100 * time.Millisecond):
-			handleIdleState(elev, doorTimer)
+			fsmHandleIdleState(elev, doorTimer)
 
 		case a := <-new_floor_chan:
-			handleNewFloor(a, elev, elevStateTx, doorTimer)
+			fsmHandleNewFloor(a, elev, elevStateTx, doorTimer)
 
 		case <-doorTimer.C:
-			handleDoorTimeout(elev, doorTimer)
+			fsmHandleDoorTimeout(elev, doorTimer)
 
 		case isObstructed := <-obstr_chan:
-			handleObstruction(isObstructed, elev, run_hra)
+			fmt.Println("Obstruction happened")
+			fsmHandleObstruction(isObstructed, elev)
 
 		case a := <-stop_chan:
-			handleEmergencyStop(a, elev, number_of_floors)
+			fsmHandleEmergencyStop(a, elev, number_of_floors)
 
 		case <-time.After(1 * time.Second):
 			elev.SetLights()
@@ -47,7 +48,7 @@ func fsm(elev *elevator.Elevator,
 	}
 }
 
-func handleRequestButtonPress(a elevio.ButtonEvent, elev *elevator.Elevator, elevStateTx chan elevator.Elevator, new_order_flag *bool) {
+func fsmHandleRequestButtonPress(a elevio.ButtonEvent, elev *elevator.Elevator, elevStateTx chan elevator.Elevator, new_order_flag *bool) {
 	fmt.Printf("%+v\n", a)
 	elev.Orders[a.Floor][a.Button].State = true
 	elev.Orders[a.Floor][a.Button].Timestamp = time.Now()
@@ -63,7 +64,7 @@ func handleRequestButtonPress(a elevio.ButtonEvent, elev *elevator.Elevator, ele
 	//elevStateTx <- *elev
 }
 
-func handleIdleState(elev *elevator.Elevator, doorTimer *time.Timer) {
+func fsmHandleIdleState(elev *elevator.Elevator, doorTimer *time.Timer) {
 	if elev.Behavior == elevator.EB_Idle {
 		elev.HandleIdleState()
 		if elev.Behavior == elevator.EB_DoorOpen {
@@ -72,7 +73,7 @@ func handleIdleState(elev *elevator.Elevator, doorTimer *time.Timer) {
 	}
 }
 
-func handleNewFloor(a int, elev *elevator.Elevator, elevStateTx chan elevator.Elevator, doorTimer *time.Timer) {
+func fsmHandleNewFloor(a int, elev *elevator.Elevator, elevStateTx chan elevator.Elevator, doorTimer *time.Timer) {
 	elev.Floor_nr = a
 	elevio.SetFloorIndicator(a)
 
@@ -84,7 +85,7 @@ func handleNewFloor(a int, elev *elevator.Elevator, elevStateTx chan elevator.El
 	elevStateTx <- *elev
 }
 
-func handleDoorTimeout(elev *elevator.Elevator, doorTimer *time.Timer) {
+func fsmHandleDoorTimeout(elev *elevator.Elevator, doorTimer *time.Timer) {
 	if elev.Obstruction {
 		fmt.Println("Waiting for obstruction to clear...")
 		doorTimer.Reset(500 * time.Millisecond)
@@ -93,26 +94,15 @@ func handleDoorTimeout(elev *elevator.Elevator, doorTimer *time.Timer) {
 	}
 }
 
-func handleObstruction(isObstructed bool, elev *elevator.Elevator, runHra chan bool) {
+func fsmHandleObstruction(isObstructed bool, elev *elevator.Elevator) {
 	elev.Obstruction = isObstructed
 
 	if isObstructed {
 		fmt.Println("Obstruction detected! Waiting for it to clear...")
-
-		// Start a timer in a separate goroutine
-		go func() {
-			time.Sleep(2 * time.Second) // If obstruction lasts more than 2 sec, reassign orders
-			if elev.Obstruction {
-				fmt.Println("Obstruction still active! Running hallRequestAssigner to redistribute hall orders...")
-				runHra <- true // ✅ Instead of ReassignOrders(), trigger hallRequestAssigner()
-			} else {
-				fmt.Println("Obstruction cleared!")
-			}
-		}()
 	}
 }
 
-func handleEmergencyStop(a bool, elev *elevator.Elevator, number_of_floors int) {
+func fsmHandleEmergencyStop(a bool, elev *elevator.Elevator, number_of_floors int) {
 	fmt.Printf("%+v\n", a)
 	elevio.SetStopLamp(true)
 	elevio.SetMotorDirection(elevio.MD_Stop)

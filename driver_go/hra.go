@@ -26,24 +26,24 @@ type HRAInput struct {
 }
 
 func hallRequestAssigner(elev *elevator.Elevator,
-	elevators map[string]*elevator.Elevator,
+	activeElevators map[string]*elevator.Elevator,
 	id string,
 	hallRequests [][2]bool,
 	cabRequests []bool,
 	hraExecutable string,
 	elevStateTx chan elevator.Elevator) {
 
-	fmt.Printf("HRA started1\n")
+	fmt.Printf("HRA started\n")
+
+
 
 	hallRequestLock.Lock()
-	elevators[id] = elev
+	activeElevators[id] = elev
 
-	// Remove stuck elevators from consideration
-	activeElevators := make(map[string]*elevator.Elevator)
-	for peerID, e := range elevators {
-		if time.Since(e.LastActive) < 5*time.Second { // ✅ Only include active elevators
-			activeElevators[peerID] = e
-		}
+	
+	for i := 0; i < config.NumFloors; i++ {
+		hallRequests[i][0] = elev.Orders[i][0].State
+		hallRequests[i][1] = elev.Orders[i][1].State
 	}
 
 	// Run the normal hall request assignment process
@@ -84,8 +84,7 @@ func hallRequestAssigner(elev *elevator.Elevator,
 	// Process the output and update orders
 	hallRequestLock.Lock()
 
-	//output er tom, så når den oppdateres blir den kun fylt med false states vi må altså somehow sørge for at det som står i output er det samme som står i elevator
-
+	
 	/*
 		output := new(map[string][][2]bool)
 		err = json.Unmarshal(ret, &output)
@@ -109,14 +108,14 @@ func hallRequestAssigner(elev *elevator.Elevator,
 
 		for i_id := range activeElevators {
 			for f := 0; f < config.NumFloors; f++ {
-				// feilen er at denne aldri blir true fordi newRequests ikke oppdateres riktig
+			
 				if newRequests[f][0] {
-					fmt.Printf("if 1 happened")
+					fmt.Printf("if 1 happened \n")
 					activeElevators[i_id].Orders[f][0].ElevatorID = assignedID
 					activeElevators[i_id].Orders[f][0].Timestamp = time.Now()
 				}
 				if newRequests[f][1] {
-					fmt.Printf("if 2 happened")
+					fmt.Printf("if 2 happened \n")
 					activeElevators[i_id].Orders[f][1].ElevatorID = assignedID
 					activeElevators[i_id].Orders[f][1].Timestamp = time.Now()
 				}
