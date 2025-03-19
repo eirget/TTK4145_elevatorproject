@@ -35,12 +35,9 @@ func hallRequestAssigner(elev *elevator.Elevator,
 
 	fmt.Printf("HRA started\n")
 
-
-
 	hallRequestLock.Lock()
 	activeElevators[id] = elev
 
-	
 	for i := 0; i < config.NumFloors; i++ {
 		hallRequests[i][0] = elev.Orders[i][0].State
 		hallRequests[i][1] = elev.Orders[i][1].State
@@ -84,7 +81,6 @@ func hallRequestAssigner(elev *elevator.Elevator,
 	// Process the output and update orders
 	hallRequestLock.Lock()
 
-	
 	/*
 		output := new(map[string][][2]bool)
 		err = json.Unmarshal(ret, &output)
@@ -108,7 +104,7 @@ func hallRequestAssigner(elev *elevator.Elevator,
 
 		for i_id := range activeElevators {
 			for f := 0; f < config.NumFloors; f++ {
-			
+
 				if newRequests[f][0] {
 					fmt.Printf("if 1 happened \n")
 					activeElevators[i_id].Orders[f][0].ElevatorID = assignedID

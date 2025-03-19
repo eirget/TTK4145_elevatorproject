@@ -20,7 +20,7 @@ func monitorElevatorActivity(elevator *elev_import.Elevator, runHra chan bool) {
 	// need to double check with some sort of "heartbeat" if it actually doesnt work, update lastActive if nothing is wrong
 	for range ticker.C {
 		if time.Since(elevator.LastActive) > 5*time.Second { // Elevator inactive for 5+ seconds
-			if elevator.HasPendingOrders(){
+			if elevator.HasPendingOrders() {
 				runHra <- true // Trigger hall request reassignment
 				return
 			}
@@ -43,7 +43,7 @@ func main() {
 	cabRequests := make([]bool, config.NumFloors)
 
 	//create map to store elevator states for all elevators on system, !!! point to discuss: *Elevator or not?
-	elevators := make(map[string]*elev_import.Elevator)
+	elevatorMap := make(map[string]*elev_import.Elevator)
 
 	addr := "localhost:" + port
 	elevio.Init(addr, config.NumFloors) //gjør til et flag
@@ -107,10 +107,9 @@ func main() {
 		case a := <-elevStateRx: //kan hende denne vil miste orders om det blir fullt i buffer
 			//update elevator to have newest state of other elevators
 			idStr := strconv.Itoa(a.ID)
-			
-			elevators[idStr] = &a //may have to directly allocate new Elevator pointer
-			fmt.Printf("elevators: %v", elevators)
-		
+
+			elevatorMap[idStr] = &a //may have to directly allocate new Elevator pointer
+			fmt.Printf("Elevators: %v", elevatorMap)
 
 			fmt.Printf("Recieved: \n")
 			fmt.Printf("Message from ID: %v\n", a.Orders[1][2].ElevatorID)
@@ -151,7 +150,7 @@ func main() {
 
 			//}
 
-			//fmt.Printf("%+v\n", elevators)
+			//fmt.Printf("%+v\n", elevatorMap)
 
 		case <-receiveRunHra:
 
@@ -160,7 +159,7 @@ func main() {
 
 			activeElevators := make(map[string]*elev_import.Elevator)
 
-			for id, elev := range elevators  {
+			for id, elev := range elevatorMap {
 				if time.Since(elev.LastActive) < 5*time.Second || !elev.HasPendingOrders() {
 					activeElevators[id] = elev
 				}

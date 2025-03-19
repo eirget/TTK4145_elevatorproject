@@ -133,21 +133,21 @@ func (e *Elevator) CloseDoorAndResume() {
 }
 
 func (e *Elevator) SetLights() {
-	for f := 0; f < config.NumFloors; f++ {
-		hallUp := e.Orders[f][BT_HallUp].State
-		hallDown := e.Orders[f][BT_HallDown].State
-		cab := e.Orders[f][BT_Cab].State
+	for floor := 0; floor < config.NumFloors; floor++ {
+		hallUp := e.Orders[floor][BT_HallUp].State
+		hallDown := e.Orders[floor][BT_HallDown].State
+		cab := e.Orders[floor][BT_Cab].State
 
-		elevio.SetButtonLamp(BT_HallUp, f, hallUp)
-		elevio.SetButtonLamp(BT_HallDown, f, hallDown)
-		elevio.SetButtonLamp(BT_Cab, f, cab)
+		elevio.SetButtonLamp(BT_HallUp, floor, hallUp)
+		elevio.SetButtonLamp(BT_HallDown, floor, hallDown)
+		elevio.SetButtonLamp(BT_Cab, floor, cab)
 	}
 }
 
 func (e *Elevator) HasPendingOrders() bool {
-	for f := 0; f < config.NumFloors; f++ {
-		for b := 0; b < config.NumButtons; b++ {
-			if e.Orders[f][b].State {
+	for floor := 0; floor < config.NumFloors; floor++ {
+		for btn := 0; btn < config.NumButtons; btn++ {
+			if e.Orders[floor][btn].State {
 				return true
 			}
 		}

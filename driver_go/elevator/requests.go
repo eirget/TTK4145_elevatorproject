@@ -7,9 +7,9 @@ import (
 )
 
 func (e *Elevator) requestsAbove() bool {
-	for f := e.Floor_nr + 1; f < config.NumFloors; f++ { //blir "+1" feil, er nok riktig
+	for floor := e.Floor_nr + 1; floor < config.NumFloors; floor++ { //blir "+1" feil, er nok riktig
 		for btn := 0; btn < config.NumButtons; btn++ {
-			if e.Orders[f][btn].State && e.Orders[f][btn].ElevatorID == e.ID {
+			if e.Orders[floor][btn].State && e.Orders[floor][btn].ElevatorID == e.ID {
 				return true
 			}
 		}
@@ -19,9 +19,9 @@ func (e *Elevator) requestsAbove() bool {
 
 // requestsBelow checks for requests below the current floor.
 func (e *Elevator) requestsBelow() bool {
-	for f := 0; f < e.Floor_nr; f++ {
+	for floor := 0; floor < e.Floor_nr; floor++ {
 		for btn := 0; btn < config.NumButtons; btn++ {
-			if e.Orders[f][btn].State && e.Orders[f][btn].ElevatorID == e.ID {
+			if e.Orders[floor][btn].State && e.Orders[floor][btn].ElevatorID == e.ID {
 				return true
 			}
 		}
@@ -39,7 +39,7 @@ func (e *Elevator) requestsHere() bool {
 	return false
 }
 
-// chooseDirection decides the next direction based on the requests.
+// chooseDirection decides the next direction based on the next request
 func (e *Elevator) ChooseDirection() (elevio.MotorDirection, ElevatorBehavior) {
 	switch e.Direction {
 	case elevio.MD_Up:
@@ -166,26 +166,3 @@ func (e *Elevator) ClearAtCurrentFloor() {
 	}
 	//fmt.Printf("After Clearing: Orders at Floor %d: %+v\n", e.Floor_nr, e.Orders[e.Floor_nr])
 }
-
-/*
-func ReassignOrders(elev Elevator) {
-	for f := 0; f < config.NumFloors; f++ {
-		for b := 0; b < config.NumButtons; b++ {
-			if elev.Orders[f][b].State { //if theres an active order
-				AssignToAnotherElevator(f, b)
-				elev.Orders[f][b].State = false
-			}
-		}
-	}
-}
-
-func AssignToAnotherElevator(floor int, button int) {
-	for id, otherElev := range main.elevators { //must get the elevators map from main
-		if !otherElev.Obstruction { //find an available elevator
-			otherElev.Orders[floor][button].State = true
-			fmt.Printf("Reassigned order on floor %d to elevator %s \n", floor, id)
-			return
-		}
-	}
-}
-*/
