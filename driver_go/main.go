@@ -14,13 +14,13 @@ import (
 
 //tested to obstruct the closest elevator to a call, the available elevator did not take over the order
 
-func monitorElevatorActivity(elevator *elev_import.Elevator, runHra chan bool) {
+func monitorElevatorActivity(e *elev_import.Elevator, runHra chan bool) {
 	ticker := time.NewTicker(1 * time.Second) // Check every second
 	defer ticker.Stop()
 	// need to double check with some sort of "heartbeat" if it actually doesnt work, update lastActive if nothing is wrong
 	for range ticker.C {
-		if time.Since(elevator.LastActive) > 5*time.Second { // Elevator inactive for 5+ seconds
-			if elevator.HasPendingOrders() {
+		if time.Since(e.LastActive) > 5*time.Second { // Elevator inactive for 5+ seconds
+			if e.HasPendingOrders() {
 				runHra <- true // Trigger hall request reassignment
 				return
 			}
@@ -70,12 +70,12 @@ func main() {
 
 	network.NetworkInit(id, peerUpdateCh, peerTxEnable, elevStateTx, elevStateRx, runHra, receiveRunHra)
 
-	a := elevio.WaitForValidFloor(elevio.MD_Up, drv_floors)
-	fmt.Println("Elevator initialized at floor:", a)
-	fmt.Println("Elevator initalized at floor: ", a)
+	eAtFloor := elevio.WaitForValidFloor(elevio.MD_Up, drv_floors)
+	fmt.Println("Elevator initialized at floor:", eAtFloor)
+	fmt.Println("Elevator initalized at floor: ", eAtFloor)
 
 	id_num, _ := strconv.Atoi(id)
-	elevator := elev_import.ElevatorInit(a, id_num) //kanskje det blir penere å bare bruke string
+	elevator := elev_import.ElevatorInit(eAtFloor, id_num) //kanskje det blir penere å bare bruke string
 
 	elevStateTx <- *elevator
 
@@ -88,31 +88,30 @@ func main() {
 
 	fmt.Printf("Started elevator system \n")
 
-	//TODO: NEED TO BROADCAST ELEVATOR STATES OFTEN, or just when changed
-
 	for {
 		select {
-		case p := <-peerUpdateCh:
+		//ikke fornøyd med navnet peers, fordi det er new og lost også
+		case peers := <-peerUpdateCh:
 			fmt.Printf("Peer update:\n")
-			fmt.Printf("  Peers:    %q\n", p.Peers)
-			fmt.Printf("  New:      %q\n", p.New)
-			fmt.Printf("  Lost:     %q\n", p.Lost)
+			fmt.Printf("  Peers:    %q\n", peers.Peers)
+			fmt.Printf("  New:      %q\n", peers.New)
+			fmt.Printf("  Lost:     %q\n", peers.Lost)
 
 			//fixed elevators knowing of eachother even without an event happening
-			if len(p.New) != 0 {
+			if len(peers.New) != 0 {
 				elevStateTx <- *elevator
 			}
 
 		//heartbeat check functionality in below case as well, time each ID, maybe peers is good enough already
-		case a := <-elevStateRx: //kan hende denne vil miste orders om det blir fullt i buffer
+		case elevRx := <-elevStateRx: //kan hende denne vil miste orders om det blir fullt i buffer
 			//update elevator to have newest state of other elevators
-			idStr := strconv.Itoa(a.ID)
+			idStr := strconv.Itoa(elevRx.ID)
 
-			elevatorMap[idStr] = &a //may have to directly allocate new Elevator pointer
+			elevatorMap[idStr] = &elevRx //may have to directly allocate new Elevator pointer
 			fmt.Printf("Elevators: %v", elevatorMap)
 
 			fmt.Printf("Recieved: \n")
-			fmt.Printf("Message from ID: %v\n", a.Orders[1][2].ElevatorID)
+			fmt.Printf("Message from ID: %v\n", elevRx.Orders[1][2].ElevatorID)
 			//fmt.Printf("Floor_nr: %v\n", a.Floor_nr)
 			//fmt.Printf("Direction %v\n", a.Direction)
 			//fmt.Println("timestamp(hall up): \n", a.Orders[a.Floor_nr][BT_HallUp].Timestamp)
@@ -120,21 +119,21 @@ func main() {
 			//NEW, idea for fixing when hall requests should actually be updated
 			//func updateHallRequests(myElevator *Elevator, receivedElev Elevator) {
 			//if idStr != id {
-			for f := 0; f < config.NumFloors; f++ {
-				for b := 0; b < config.NumButtons-1; b++ { // Only HallUp and HallDown
+			for floor := 0; floor < config.NumFloors; floor++ {
+				for btn := 0; btn < config.NumButtons-1; btn++ { // Only HallUp and HallDown
 					// Compare timestamps to ensure only newer updates are accepted
-					if a.Orders[f][b].Timestamp.After(elevator.Orders[f][b].Timestamp) {
-						elevator.Orders[f][b] = a.Orders[f][b]
+					if elevRx.Orders[floor][btn].Timestamp.After(elevator.Orders[floor][btn].Timestamp) {
+						elevator.Orders[floor][btn] = elevRx.Orders[floor][btn]
 					}
 				}
 			}
 			//}
 
-			for f := 0; f < config.NumFloors; f++ {
-				fmt.Printf("\n Floornr: %+v ", f)
-				for b := elevio.ButtonType(0); b < 3; b++ {
-					fmt.Printf("%+v ", a.Orders[f][b].State)
-					fmt.Printf("%+v, ", a.Orders[f][b].ElevatorID)
+			for floor := 0; floor < config.NumFloors; floor++ {
+				fmt.Printf("\n Floornr: %+v ", floor)
+				for btn := elevio.ButtonType(0); btn < config.NumButtons; btn++ {
+					fmt.Printf("%+v ", elevRx.Orders[floor][btn].State)
+					fmt.Printf("%+v, ", elevRx.Orders[floor][btn].ElevatorID)
 				}
 
 			}
