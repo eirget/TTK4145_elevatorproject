@@ -9,11 +9,11 @@ import (
 	"flag"
 	"fmt"
 	"strconv"
+	"sync"
 	"time"
 )
 
-//tested to obstruct the closest elevator to a call, the available elevator did not take over the order
-
+// where should this go???
 func monitorElevatorActivity(e *elev_import.Elevator, runHra chan bool) {
 	ticker := time.NewTicker(1 * time.Second) // Check every second
 	defer ticker.Stop()
@@ -28,6 +28,8 @@ func monitorElevatorActivity(e *elev_import.Elevator, runHra chan bool) {
 	}
 }
 
+var elevatorMapLock sync.Mutex //NEW
+
 func main() {
 
 	hraExecutable := "hall_request_assigner"
@@ -39,14 +41,16 @@ func main() {
 	flag.StringVar(&port, "port", "", "port of this peer")
 	flag.Parse()
 
+	//cant these just be made inside hra instead?
 	hallRequests := make([][2]bool, config.NumFloors)
 	cabRequests := make([]bool, config.NumFloors)
 
-	//create map to store elevator states for all elevators on system, !!! point to discuss: *Elevator or not?
+	//create map to store elevator states for all elevators on system, to backup orders
+	//why string? maybe just decide that all cases of ID should just be string
 	elevatorMap := make(map[string]*elev_import.Elevator)
 
 	addr := "localhost:" + port
-	elevio.Init(addr, config.NumFloors) //gjør til et flag
+	elevio.Init(addr, config.NumFloors)
 
 	//fmt.Printf("Before go routines \n")
 
@@ -71,18 +75,16 @@ func main() {
 	network.NetworkInit(id, peerUpdateCh, peerTxEnable, elevStateTx, elevStateRx, runHra, receiveRunHra)
 
 	eAtFloor := elevio.WaitForValidFloor(elevio.MD_Up, drv_floors)
-	fmt.Println("Elevator initialized at floor:", eAtFloor)
 	fmt.Println("Elevator initalized at floor: ", eAtFloor)
 
 	id_num, _ := strconv.Atoi(id)
-	elevator := elev_import.ElevatorInit(eAtFloor, id_num) //kanskje det blir penere å bare bruke string
+	elevator := elev_import.ElevatorInit(eAtFloor, id_num) //figure out if the impostet file should change name (like this) or of the elevator.go file should change name, or maybe nothing should just be named elevator!
 
 	elevStateTx <- *elevator
 
 	elevio.SetFloorIndicator(elevator.Floor_nr)
 
-	go fsm(elevator, elevStateTx, drv_buttons, drv_floors, drv_obstr, drv_stop, config.NumFloors, runHra)
-	//go hraSignalListener(elevator, elevators, id, hallRequests, cabRequests, hraExecutable, elevStateTx, run_hra)
+	go fsm(elevator, elevStateTx, drv_buttons, drv_floors, drv_obstr, drv_stop, config.NumFloors)
 
 	go monitorElevatorActivity(elevator, runHra)
 
@@ -90,25 +92,52 @@ func main() {
 
 	for {
 		select {
-		//ikke fornøyd med navnet peers, fordi det er new og lost også
-		case peers := <-peerUpdateCh:
+		case peerUpdate := <-peerUpdateCh:
 			fmt.Printf("Peer update:\n")
-			fmt.Printf("  Peers:    %q\n", peers.Peers)
-			fmt.Printf("  New:      %q\n", peers.New)
-			fmt.Printf("  Lost:     %q\n", peers.Lost)
+			fmt.Printf("  Peers:    %q\n", peerUpdate.Peers)
+			fmt.Printf("  New:      %q\n", peerUpdate.New)
+			fmt.Printf("  Lost:     %q\n", peerUpdate.Lost)
 
 			//fixed elevators knowing of eachother even without an event happening
-			if len(peers.New) != 0 {
+			if len(peerUpdate.New) != 0 {
 				elevStateTx <- *elevator
+				//when an elevator loses power, but then gets power again AND connects to the internet again it gets is old cad orders back through its whole Orders
+				//the hall call part of Orders in the elevators map should have been updated while it was disconnected also
+				//QUESTION: do we need to have functionality for the case where an elevator loses power, gets power again but does NOT connect back on the Internet? should it still get its cab calls somehow
+				//hra should maybe be run when new and lost change
+				if lastState, exists := elevatorMap[peerUpdate.New]; exists {
+					fmt.Printf("Elevator %s reconnected! Restoring previous orders.\n", peerUpdate.New)
+					elevatorMap[peerUpdate.New].Orders = lastState.Orders // Restore orders
+					elevStateTx <- *elevatorMap[peerUpdate.New]           // Broadcast restored state
+				} else {
+					fmt.Printf("Elevator %s is new, initializing.\n", peerUpdate.New)
+				}
 			}
 
-		//heartbeat check functionality in below case as well, time each ID, maybe peers is good enough already
-		case elevRx := <-elevStateRx: //kan hende denne vil miste orders om det blir fullt i buffer
+			//the new part of peers will only include one id, it is not a list, is that ok?
+
+			/*
+				for newID := range peerUpdate.New {
+					if lastState, exists := elevatorMap[newID]; exists {
+						fmt.Printf("Elevator %s reconnected! Restoring previous orders.\n", newID)
+						elevatorMap[newID].Orders = lastState.Orders // Restore orders
+						elevStateTx <- *elevatorMap[newID]           // Broadcast restored state
+					} else {
+						fmt.Printf("Elevator %s is new, initializing.\n", newID)
+					}
+				}
+			*/
+
+		//is current "heartbeat" functionality enough?
+		//maybe both variable and channel name should include that these are states, maybe change names
+		case elevRx := <-elevStateRx: //can the buffer cause packet loss?
 			//update elevator to have newest state of other elevators
 			idStr := strconv.Itoa(elevRx.ID)
 
+			elevatorMapLock.Lock()
 			elevatorMap[idStr] = &elevRx //may have to directly allocate new Elevator pointer
 			fmt.Printf("Elevators: %v", elevatorMap)
+			elevatorMapLock.Unlock()
 
 			fmt.Printf("Recieved: \n")
 			fmt.Printf("Message from ID: %v\n", elevRx.Orders[1][2].ElevatorID)
@@ -129,25 +158,25 @@ func main() {
 			}
 			//}
 
-			for floor := 0; floor < config.NumFloors; floor++ {
-				fmt.Printf("\n Floornr: %+v ", floor)
-				for btn := elevio.ButtonType(0); btn < config.NumButtons; btn++ {
-					fmt.Printf("%+v ", elevRx.Orders[floor][btn].State)
-					fmt.Printf("%+v, ", elevRx.Orders[floor][btn].ElevatorID)
+			/*
+				for floor := 0; floor < config.NumFloors; floor++ {
+					fmt.Printf("\n Floornr: %+v ", floor)
+					for btn := elevio.ButtonType(0); btn < config.NumButtons; btn++ {
+						fmt.Printf("%+v ", elevRx.Orders[floor][btn].State)
+						fmt.Printf("%+v, ", elevRx.Orders[floor][btn].ElevatorID)
+					}
+
 				}
+				fmt.Printf("\n")
+				fmt.Printf("Timestamp: %v \n", time.Now())
 
-			}
-			fmt.Printf("\n")
-			fmt.Printf("Timestamp: %v \n", time.Now())
+				elevator.SetLights()
 
-			elevator.SetLights()
-
-			if new_order_flag {
-				runHra <- true
-				new_order_flag = false
-			}
-
-			//}
+				if new_order_flag {
+					runHra <- true
+					new_order_flag = false
+				}
+			*/
 
 			//fmt.Printf("%+v\n", elevatorMap)
 
@@ -158,11 +187,14 @@ func main() {
 
 			activeElevators := make(map[string]*elev_import.Elevator)
 
+			elevatorMapLock.Lock()
 			for id, elev := range elevatorMap {
 				if time.Since(elev.LastActive) < 5*time.Second || !elev.HasPendingOrders() {
 					activeElevators[id] = elev
 				}
 			}
+			elevatorMapLock.Unlock()
+
 			go hallRequestAssigner(elevator, activeElevators, id, hallRequests, cabRequests, hraExecutable, elevStateRx)
 
 			//might not be neccessary at all

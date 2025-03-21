@@ -15,8 +15,7 @@ func fsm(e *elevator.Elevator,
 	new_floor_chan chan int,
 	obstr_chan chan bool,
 	stop_chan chan bool,
-	number_of_floors int,
-	run_hra chan bool) {
+	number_of_floors int) {
 
 	doorTimer := time.NewTimer(0)
 	<-doorTimer.C
@@ -61,7 +60,6 @@ func fsmHandleRequestButtonPress(a elevio.ButtonEvent, e *elevator.Elevator, ele
 		elevio.SetButtonLamp(a.Button, a.Floor, true)
 	}
 	*new_order_flag = true
-	//elevStateTx <- *elev
 }
 
 func fsmHandleIdleState(e *elevator.Elevator, doorTimer *time.Timer) {
