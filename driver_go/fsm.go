@@ -88,6 +88,8 @@ func fsmHandleDoorTimeout(e *elevator.Elevator, doorTimer *time.Timer) {
 		fmt.Println("Waiting for obstruction to clear...")
 		doorTimer.Reset(500 * time.Millisecond)
 	} else {
+		fmt.Println("Close door and resume called")
+		// might have to fix the two-hall-call-problem here
 		e.CloseDoorAndResume()
 	}
 }

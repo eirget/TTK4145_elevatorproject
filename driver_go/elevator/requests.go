@@ -30,7 +30,7 @@ func (e *Elevator) requestsBelow() bool {
 }
 
 // requestsHere checks for requests at the current floor.
-func (e *Elevator) requestsHere() bool {
+func (e *Elevator) RequestsHere() bool {
 	for btn := 0; btn < config.NumButtons; btn++ {
 		if e.Orders[e.Floor_nr][btn].State && e.Orders[e.Floor_nr][btn].ElevatorID == e.ID {
 			return true
@@ -46,7 +46,7 @@ func (e *Elevator) ChooseDirection() (elevio.MotorDirection, ElevatorBehavior) {
 		if e.requestsAbove() {
 			return elevio.MD_Up, EB_Moving
 		}
-		if e.requestsHere() {
+		if e.RequestsHere() {
 			return elevio.MD_Down, EB_DoorOpen
 		}
 		if e.requestsBelow() {
@@ -57,7 +57,7 @@ func (e *Elevator) ChooseDirection() (elevio.MotorDirection, ElevatorBehavior) {
 		if e.requestsBelow() {
 			return elevio.MD_Down, EB_Moving
 		}
-		if e.requestsHere() {
+		if e.RequestsHere() {
 			return elevio.MD_Up, EB_DoorOpen
 		}
 		if e.requestsAbove() {
@@ -65,7 +65,7 @@ func (e *Elevator) ChooseDirection() (elevio.MotorDirection, ElevatorBehavior) {
 		}
 		return elevio.MD_Stop, EB_Idle
 	case elevio.MD_Stop:
-		if e.requestsHere() {
+		if e.RequestsHere() {
 			return elevio.MD_Stop, EB_DoorOpen
 		}
 		if e.requestsAbove() {

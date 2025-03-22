@@ -17,14 +17,25 @@ import (
 func monitorElevatorActivity(e *elev_import.Elevator, runHra chan bool) {
 	ticker := time.NewTicker(1 * time.Second) // Check every second
 	defer ticker.Stop()
+	fmt.Printf("Last active: %v \n: ", e.LastActive)
 	// need to double check with some sort of "heartbeat" if it actually doesnt work, update lastActive if nothing is wrong
 	for range ticker.C {
 		if time.Since(e.LastActive) > 5*time.Second { // Elevator inactive for 5+ seconds
+			fmt.Println("I have been inactive")
 			if e.HasPendingOrders() {
+				fmt.Println("And I have pending orders, calling hall request assigner")
 				runHra <- true // Trigger hall request reassignment
-				return
+				//return
 			}
 		}
+	}
+}
+
+func periodicallySetLights(e *elev_import.Elevator) {
+	ticker := time.NewTicker(100 * time.Millisecond) // Check every second
+	defer ticker.Stop()
+	for range ticker.C {
+		e.SetLights()
 	}
 }
 
@@ -87,6 +98,8 @@ func main() {
 	go fsm(elevator, elevStateTx, drv_buttons, drv_floors, drv_obstr, drv_stop, config.NumFloors)
 
 	go monitorElevatorActivity(elevator, runHra)
+
+	go periodicallySetLights(elevator)
 
 	fmt.Printf("Started elevator system \n")
 
@@ -158,25 +171,23 @@ func main() {
 			}
 			//}
 
-			/*
-				for floor := 0; floor < config.NumFloors; floor++ {
-					fmt.Printf("\n Floornr: %+v ", floor)
-					for btn := elevio.ButtonType(0); btn < config.NumButtons; btn++ {
-						fmt.Printf("%+v ", elevRx.Orders[floor][btn].State)
-						fmt.Printf("%+v, ", elevRx.Orders[floor][btn].ElevatorID)
-					}
-
+			for floor := 0; floor < config.NumFloors; floor++ {
+				fmt.Printf("\n Floornr: %+v ", floor)
+				for btn := elevio.ButtonType(0); btn < config.NumButtons; btn++ {
+					fmt.Printf("%+v ", elevRx.Orders[floor][btn].State)
+					fmt.Printf("%+v, ", elevRx.Orders[floor][btn].ElevatorID)
 				}
-				fmt.Printf("\n")
-				fmt.Printf("Timestamp: %v \n", time.Now())
 
-				elevator.SetLights()
+			}
+			fmt.Printf("\n")
+			fmt.Printf("Timestamp: %v \n", time.Now())
 
-				if new_order_flag {
-					runHra <- true
-					new_order_flag = false
-				}
-			*/
+			elevator.SetLights()
+
+			if new_order_flag {
+				runHra <- true
+				new_order_flag = false
+			}
 
 			//fmt.Printf("%+v\n", elevatorMap)
 
@@ -185,11 +196,12 @@ func main() {
 			//actually create logic that will be correct for all cases
 			fmt.Println("Received runHra signal")
 
-			activeElevators := make(map[string]*elev_import.Elevator)
+			activeElevators := make(map[string]*elev_import.Elevator) //have just in pure main
+			//just empty active elevators here
 
 			elevatorMapLock.Lock()
 			for id, elev := range elevatorMap {
-				if time.Since(elev.LastActive) < 5*time.Second || !elev.HasPendingOrders() {
+				if time.Since(elev.LastActive) < 5*time.Second { //|| !elev.HasPendingOrders() {
 					activeElevators[id] = elev
 				}
 			}

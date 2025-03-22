@@ -126,6 +126,7 @@ func (e *Elevator) StopAtFloor() {
 func (e *Elevator) CloseDoorAndResume() {
 	e.LastActive = time.Now()
 	e.Behavior = EB_Idle
+	fmt.Printf("Behavior. %v \n", e.Behavior)
 	elevio.SetDoorOpenLamp(false)
 	e.Direction, e.Behavior = e.ChooseDirection()
 	elevio.SetMotorDirection(e.Direction)
