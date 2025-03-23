@@ -26,6 +26,7 @@ type HRAInput struct {
 }
 
 func hallRequestAssigner(elev *elevator.Elevator,
+	elevatorMap map[string]*elevator.Elevator,
 	activeElevators map[string]*elevator.Elevator,
 	id string,
 	hallRequests [][2]bool,
@@ -36,7 +37,10 @@ func hallRequestAssigner(elev *elevator.Elevator,
 	fmt.Printf("HRA started\n")
 
 	hallRequestLock.Lock()
-	activeElevators[id] = elev
+	//activeElevators[id] = elev //?
+	elevatorMap[id] = elev
+
+	//tror probleme ligger under her
 
 	for i := 0; i < config.NumFloors; i++ {
 		hallRequests[i][0] = elev.Orders[i][0].State
@@ -51,8 +55,9 @@ func hallRequestAssigner(elev *elevator.Elevator,
 
 	for peerID, e := range activeElevators {
 		for f := 0; f < config.NumFloors; f++ {
-			cabRequests[f] = e.Orders[f][2].State
+			cabRequests[f] = e.Orders[f][2].State     //SE NØYE PÅ DETTE
 		}
+		fmt.Printf("Elevator behaviour of id %s: %v\n", peerID, e.Behavior)
 		input.States[peerID] = HRAElevState{
 			Behavior:    elevator.BehaviorMap[e.Behavior],
 			Floor:       e.Floor_nr,

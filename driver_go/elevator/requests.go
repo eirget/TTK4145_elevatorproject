@@ -39,7 +39,7 @@ func (e *Elevator) RequestsHere() bool {
 	return false
 }
 
-// chooseDirection decides the next direction based on the next request
+// chooseDirection decides the next direction based on Orders
 func (e *Elevator) ChooseDirection() (elevio.MotorDirection, ElevatorBehavior) {
 	switch e.Direction {
 	case elevio.MD_Up:
@@ -66,7 +66,7 @@ func (e *Elevator) ChooseDirection() (elevio.MotorDirection, ElevatorBehavior) {
 		return elevio.MD_Stop, EB_Idle
 	case elevio.MD_Stop:
 		if e.RequestsHere() {
-			return elevio.MD_Stop, EB_DoorOpen
+			return elevio.MD_Stop, EB_Idle  //did say DoorOpen
 		}
 		if e.requestsAbove() {
 			return elevio.MD_Up, EB_Moving
@@ -92,7 +92,7 @@ func (e *Elevator) ShouldStop() bool {
 			(e.Orders[e.Floor_nr][BT_Cab].State && e.Orders[e.Floor_nr][BT_Cab].ElevatorID == e.ID) ||
 			!e.requestsAbove()
 	case elevio.MD_Stop:
-		return true
+		return e.RequestsHere()
 	default:
 		return false
 	}

@@ -86,11 +86,9 @@ func ElevatorInit(floor_nr int, id int) *Elevator {
 
 func (e *Elevator) HandleIdleState() {
 	e.LastActive = time.Now()
-	dirn, newBehavior := e.ChooseDirection()
-	e.Behavior = newBehavior
-	e.Direction = dirn
-
-	switch newBehavior {
+	e.Direction, e.Behavior = e.ChooseDirection()
+	
+	switch e.Behavior {
 	case EB_Moving:
 		e.StartMoving()
 	case EB_DoorOpen:

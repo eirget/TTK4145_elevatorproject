@@ -26,7 +26,7 @@ func fsm(e *elevator.Elevator,
 			fsmHandleRequestButtonPress(newReq, e, elevStateTx, &new_order_flag)
 
 		case <-time.After(100 * time.Millisecond):
-			fsmHandleIdleState(e, doorTimer)
+			fsmHandleIdleState(e, elevStateTx, doorTimer)
 
 		case newFloor := <-new_floor_chan:
 			fsmHandleNewFloor(newFloor, e, elevStateTx, doorTimer)
@@ -41,8 +41,8 @@ func fsm(e *elevator.Elevator,
 		case isStopped := <-stop_chan:
 			fsmHandleEmergencyStop(isStopped, e, number_of_floors)
 
-		case <-time.After(1 * time.Second):
-			e.SetLights()
+		//case <-time.After(1 * time.Second):
+		//	elevStateTx <- *e
 		}
 	}
 }
@@ -62,20 +62,21 @@ func fsmHandleRequestButtonPress(a elevio.ButtonEvent, e *elevator.Elevator, ele
 	*new_order_flag = true
 }
 
-func fsmHandleIdleState(e *elevator.Elevator, doorTimer *time.Timer) {
+func fsmHandleIdleState(e *elevator.Elevator, elevStateTx chan elevator.Elevator, doorTimer *time.Timer) {
 	//DENNE IF'EN ER NY
-	if e.ShouldStop() {
-		fmt.Println("Reopening door at same floor to serve additional order")
-		e.StopAtFloor()
-		doorTimer.Reset(3 * time.Second)
-		return
-	}
 	if e.Behavior == elevator.EB_Idle {
+		if e.ShouldStop() {
+			fmt.Println("Reopening at same floor to serve additional order")
+			e.StopAtFloor()
+			doorTimer.Reset(3 * time.Second)
+			return
+		}
 		e.HandleIdleState()
 		if e.Behavior == elevator.EB_DoorOpen {
 			doorTimer.Reset(5 * time.Second)
 		}
 	}
+	elevStateTx <- *e
 }
 
 func fsmHandleNewFloor(a int, e *elevator.Elevator, elevStateTx chan elevator.Elevator, doorTimer *time.Timer) {
@@ -98,7 +99,6 @@ func fsmHandleDoorTimeout(e *elevator.Elevator, doorTimer *time.Timer) {
 		fmt.Println("Close door and resume called")
 		// might have to fix the two-hall-call-problem here
 		e.CloseDoorAndResume()
-
 	}
 }
 
