@@ -53,8 +53,6 @@ func main() {
 	flag.Parse()
 
 	//cant these just be made inside hra instead?
-	hallRequests := make([][2]bool, config.NumFloors)
-	cabRequests := make([]bool, config.NumFloors)
 
 	//create map to store elevator states for all elevators on system, to backup orders
 	//why string? maybe just decide that all cases of ID should just be string
@@ -108,10 +106,14 @@ func main() {
 		for elevRx := range elevStateRx {
 			//update elevator to have newest state of other elevators
 			idStr := strconv.Itoa(elevRx.ID)
-			
-	
+
 			elevatorMapLock.Lock()
-			elevatorMap[idStr] = &elevRx //may have to directly allocate new Elevator pointer
+
+			//elevatorMap[idStr] = &elevRx //may have to directly allocate new Elevator pointer
+			//alternative to the above line:
+			copy := elevRx
+			elevatorMap[idStr] = &copy
+
 			fmt.Printf("Elevators: %v\n", elevatorMap)
 			elevatorVar := elevatorMap[idStr]
 			fmt.Printf("Elevator behavior: %v id: %d", elevatorVar.Behavior, elevatorVar.ID)
@@ -206,7 +208,6 @@ func main() {
 		//is current "heartbeat" functionality enough?
 		//maybe both variable and channel name should include that these are states, maybe change names
 		//case elevRx := <-elevStateRx: //can the buffer cause packet loss?
-			
 
 		case <-receiveRunHra:
 
@@ -224,17 +225,18 @@ func main() {
 			for id, elev := range elevatorMap {
 				fmt.Printf("Elevator behaviour of id %s before hra: %v\n", id, elev.Behavior)
 				fmt.Printf("Last active of id %v: ", id)
-					fmt.Println(elev.LastActive)
-					fmt.Printf("Time now: %v", time.Now())
+				fmt.Println(elev.LastActive)
+				fmt.Printf("Time now: %v", time.Now())
 				if time.Since(elev.LastActive) < 5*time.Second { //|| !elev.HasPendingOrders() {
-					activeElevators[id] = elev
+					copy := *elev
+					activeElevators[id] = &copy
 				}
 			}
 
 			fmt.Printf("Active elevators: %v\n", activeElevators)
 			elevatorMapLock.Unlock()
 
-			go hallRequestAssigner(elevator, elevatorMap, activeElevators, id, hallRequests, cabRequests, hraExecutable, elevStateRx)
+			go hallRequestAssigner(elevator, elevatorMap, activeElevators, id, hraExecutable, elevStateRx)
 
 			//might not be neccessary at all
 			//case <-time.After(500 * time.Millisecond):

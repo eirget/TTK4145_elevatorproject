@@ -29,12 +29,13 @@ func hallRequestAssigner(elev *elevator.Elevator,
 	elevatorMap map[string]*elevator.Elevator,
 	activeElevators map[string]*elevator.Elevator,
 	id string,
-	hallRequests [][2]bool,
-	cabRequests []bool,
 	hraExecutable string,
 	elevStateTx chan elevator.Elevator) {
 
 	fmt.Printf("HRA started\n")
+
+	hallRequests := make([][2]bool, config.NumFloors)
+	//cabRequests := make([]bool, config.NumFloors)
 
 	hallRequestLock.Lock()
 	//activeElevators[id] = elev //?
@@ -54,15 +55,16 @@ func hallRequestAssigner(elev *elevator.Elevator,
 	}
 
 	for peerID, e := range activeElevators {
+		individualCabRequests := make([]bool, config.NumFloors)
 		for f := 0; f < config.NumFloors; f++ {
-			cabRequests[f] = e.Orders[f][2].State     //SE NØYE PÅ DETTE
+			individualCabRequests[f] = e.Orders[f][2].State //SE NØYE PÅ DETTE
 		}
 		fmt.Printf("Elevator behaviour of id %s: %v\n", peerID, e.Behavior)
 		input.States[peerID] = HRAElevState{
 			Behavior:    elevator.BehaviorMap[e.Behavior],
 			Floor:       e.Floor_nr,
 			Direction:   elevator.DirectionMap[e.Direction],
-			CabRequests: cabRequests,
+			CabRequests: individualCabRequests,
 		}
 	}
 
@@ -107,22 +109,40 @@ func hallRequestAssigner(elev *elevator.Elevator,
 
 		fmt.Println("New requests from HRA:", newRequests) //DEBUG
 
-		for i_id := range activeElevators {
-			for f := 0; f < config.NumFloors; f++ {
+		/*
+			for i_id := range activeElevators {
+				for f := 0; f < config.NumFloors; f++ {
 
-				if newRequests[f][0] {
-					fmt.Printf("if 1 happened \n")
-					activeElevators[i_id].Orders[f][0].ElevatorID = assignedID
-					activeElevators[i_id].Orders[f][0].Timestamp = time.Now()
-				}
-				if newRequests[f][1] {
-					fmt.Printf("if 2 happened \n")
-					activeElevators[i_id].Orders[f][1].ElevatorID = assignedID
-					activeElevators[i_id].Orders[f][1].Timestamp = time.Now()
+					if newRequests[f][0] {
+						fmt.Printf("if 1 happened \n")
+						activeElevators[i_id].Orders[f][0].ElevatorID = assignedID
+						activeElevators[i_id].Orders[f][0].Timestamp = time.Now()
+					}
+					if newRequests[f][1] {
+						fmt.Printf("if 2 happened \n")
+						activeElevators[i_id].Orders[f][1].ElevatorID = assignedID
+						activeElevators[i_id].Orders[f][1].Timestamp = time.Now()
+					}
 				}
 			}
+			elev.Orders = activeElevators[id].Orders
+		*/ //dont do this
+		e, exists := activeElevators[peerID]
+		if !exists || e == nil {
+			fmt.Printf("Warning: No active elevator with ID %s\n", peerID)
+			continue
 		}
-		elev.Orders = activeElevators[id].Orders
+
+		for f := 0; f < config.NumFloors; f++ {
+			if newRequests[f][0] {
+				e.Orders[f][0].ElevatorID = assignedID
+				e.Orders[f][0].Timestamp = time.Now()
+			}
+			if newRequests[f][1] {
+				e.Orders[f][1].ElevatorID = assignedID
+				e.Orders[f][1].Timestamp = time.Now()
+			}
+		}
 	}
 
 	// Notify FSM
