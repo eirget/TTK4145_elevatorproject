@@ -193,6 +193,8 @@ func main() {
 
 		case <-receiveRunHra:
 
+			//sleep at the beginning of hra? or timer? just something to delay a little bit so that all elevators have latest orders
+
 			//actually create logic that will be correct for all cases
 			fmt.Println("Received runHra signal")
 

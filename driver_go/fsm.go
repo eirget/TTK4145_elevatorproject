@@ -33,7 +33,7 @@ func fsm(e *elevator.Elevator,
 
 		case <-doorTimer.C:
 			fsmHandleDoorTimeout(e, doorTimer)
-
+		//maybe name obstructionState? I misunderstood this variable name
 		case isObstructed := <-obstr_chan:
 			fmt.Println("Obstruction happened")
 			fsmHandleObstruction(isObstructed, e)
@@ -63,6 +63,13 @@ func fsmHandleRequestButtonPress(a elevio.ButtonEvent, e *elevator.Elevator, ele
 }
 
 func fsmHandleIdleState(e *elevator.Elevator, doorTimer *time.Timer) {
+	//DENNE IF'EN ER NY
+	if e.ShouldStop() {
+		fmt.Println("Reopening door at same floor to serve additional order")
+		e.StopAtFloor()
+		doorTimer.Reset(3 * time.Second)
+		return
+	}
 	if e.Behavior == elevator.EB_Idle {
 		e.HandleIdleState()
 		if e.Behavior == elevator.EB_DoorOpen {
@@ -91,6 +98,7 @@ func fsmHandleDoorTimeout(e *elevator.Elevator, doorTimer *time.Timer) {
 		fmt.Println("Close door and resume called")
 		// might have to fix the two-hall-call-problem here
 		e.CloseDoorAndResume()
+
 	}
 }
 
