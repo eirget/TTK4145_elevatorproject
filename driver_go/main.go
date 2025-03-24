@@ -114,13 +114,17 @@ func main() {
 			copy := elevRx
 			elevatorMap[idStr] = &copy
 
-			fmt.Printf("Elevators: %v\n", elevatorMap)
-			elevatorVar := elevatorMap[idStr]
-			fmt.Printf("Elevator behavior: %v id: %d", elevatorVar.Behavior, elevatorVar.ID)
+			if idStr == id {
+				elevator.Orders = elevRx.Orders
+				elevator.LastActive = time.Now()
+				//new_order_flag = true
+			}
+
+			//fmt.Printf("Elevators: %v\n", elevatorMap)
+			//elevatorVar := elevatorMap[idStr]
+			//fmt.Printf("Elevator behavior: %v id: %d", elevatorVar.Behavior, elevatorVar.ID)
 			elevatorMapLock.Unlock()
 
-			fmt.Printf("Recieved: \n")
-			fmt.Printf("Message from ID: %v\n", elevRx.Orders[1][2].ElevatorID)
 			//fmt.Printf("Floor_nr: %v\n", a.Floor_nr)
 			//fmt.Printf("Direction %v\n", a.Direction)
 			//fmt.Println("timestamp(hall up): \n", a.Orders[a.Floor_nr][BT_HallUp].Timestamp)
@@ -129,28 +133,32 @@ func main() {
 			//func updateHallRequests(myElevator *Elevator, receivedElev Elevator) {
 			//if idStr != id {
 
-			//updated := false
+			updated := false
 			for floor := 0; floor < config.NumFloors; floor++ {
 				for btn := 0; btn < config.NumButtons-1; btn++ { // Only HallUp and HallDown
 					// Compare timestamps to ensure only newer updates are accepted
 					if elevRx.Orders[floor][btn].Timestamp.After(elevator.Orders[floor][btn].Timestamp) {
 						elevator.Orders[floor][btn] = elevRx.Orders[floor][btn]
-						//updated = true
+						updated = true
 					}
 				}
 			}
 			//}
-
-			for floor := 0; floor < config.NumFloors; floor++ {
-				fmt.Printf("\n Floornr: %+v ", floor)
-				for btn := elevio.ButtonType(0); btn < config.NumButtons; btn++ {
-					fmt.Printf("%+v ", elevRx.Orders[floor][btn].State)
-					fmt.Printf("%+v, ", elevRx.Orders[floor][btn].ElevatorID)
+			if updated {
+				updated = false
+				fmt.Printf("Recieved: \n")
+				fmt.Printf("Message from ID: %v\n", elevRx.Orders[1][2].ElevatorID)
+				for floor := 0; floor < config.NumFloors; floor++ {
+					fmt.Printf("\n Floornr: %+v ", floor)
+					for btn := elevio.ButtonType(0); btn < config.NumButtons; btn++ {
+						fmt.Printf("%+v ", elevRx.Orders[floor][btn].State)
+						fmt.Printf("%+v, ", elevRx.Orders[floor][btn].ElevatorID)
+					}
 				}
+				fmt.Printf("\n")
+				fmt.Printf("Timestamp: %v \n", time.Now())
 
 			}
-			fmt.Printf("\n")
-			fmt.Printf("Timestamp: %v \n", time.Now())
 
 			elevator.SetLights()
 
@@ -167,6 +175,9 @@ func main() {
 		}
 	}()
 
+	var latestLost []string
+	var latesetLostMutex sync.Mutex
+
 	for {
 		select {
 		case peerUpdate := <-peerUpdateCh:
@@ -175,20 +186,29 @@ func main() {
 			fmt.Printf("  New:      %q\n", peerUpdate.New)
 			fmt.Printf("  Lost:     %q\n", peerUpdate.Lost)
 
+			latesetLostMutex.Lock()
+			latestLost = peerUpdate.Lost
+			latesetLostMutex.Unlock()
+
 			//fixed elevators knowing of eachother even without an event happening
 			if len(peerUpdate.New) != 0 {
 				elevStateTx <- *elevator
-				//when an elevator loses power, but then gets power again AND connects to the internet again it gets is old cad orders back through its whole Orders
+				//when an elevator loses power, but then gets power again AND connects to the internet again it gets its old cab orders back through its whole Orders
 				//the hall call part of Orders in the elevators map should have been updated while it was disconnected also
 				//QUESTION: do we need to have functionality for the case where an elevator loses power, gets power again but does NOT connect back on the Internet? should it still get its cab calls somehow
 				//hra should maybe be run when new and lost change
 				if lastState, exists := elevatorMap[peerUpdate.New]; exists {
 					fmt.Printf("Elevator %s reconnected! Restoring previous orders.\n", peerUpdate.New)
 					elevatorMap[peerUpdate.New].Orders = lastState.Orders // Restore orders
-					elevStateTx <- *elevatorMap[peerUpdate.New]           // Broadcast restored state
+					fmt.Printf("Orders at ID %s: %v", peerUpdate.New, elevatorMap[peerUpdate.New].Orders)
+					elevStateTx <- *elevatorMap[peerUpdate.New] // Broadcast restored state
 				} else {
 					fmt.Printf("Elevator %s is new, initializing.\n", peerUpdate.New)
 				}
+			}
+
+			if len(peerUpdate.Lost) != 0 {
+				runHra <- true
 			}
 
 			//the new part of peers will only include one id, it is not a list, is that ok?
@@ -227,10 +247,15 @@ func main() {
 				fmt.Printf("Last active of id %v: ", id)
 				fmt.Println(elev.LastActive)
 				fmt.Printf("Time now: %v", time.Now())
+				if contains(latestLost, id) {
+					continue
+				}
+
 				if time.Since(elev.LastActive) < 5*time.Second { //|| !elev.HasPendingOrders() {
 					copy := *elev
 					activeElevators[id] = &copy
 				}
+
 			}
 
 			fmt.Printf("Active elevators: %v\n", activeElevators)
@@ -243,4 +268,13 @@ func main() {
 			//	elevStateTx <- *elevator
 		}
 	}
+}
+
+func contains(slice []string, item string) bool {
+	for _, v := range slice {
+		if v == item {
+			return true
+		}
+	}
+	return false
 }

@@ -39,7 +39,7 @@ func hallRequestAssigner(elev *elevator.Elevator,
 
 	hallRequestLock.Lock()
 	//activeElevators[id] = elev //?
-	elevatorMap[id] = elev
+	//elevatorMap[id] = elev
 
 	//tror probleme ligger under her
 
@@ -86,7 +86,6 @@ func hallRequestAssigner(elev *elevator.Elevator,
 	}
 
 	// Process the output and update orders
-	hallRequestLock.Lock()
 
 	/*
 		output := new(map[string][][2]bool)
@@ -103,6 +102,8 @@ func hallRequestAssigner(elev *elevator.Elevator,
 		fmt.Println("json.Unmarshal error ", err)
 		return
 	}
+
+	hallRequestLock.Lock()
 
 	for peerID, newRequests := range output {
 		assignedID, _ := strconv.Atoi(peerID)
@@ -133,19 +134,67 @@ func hallRequestAssigner(elev *elevator.Elevator,
 			continue
 		}
 
-		for f := 0; f < config.NumFloors; f++ {
-			if newRequests[f][0] {
-				e.Orders[f][0].ElevatorID = assignedID
-				e.Orders[f][0].Timestamp = time.Now()
+		/*
+			for f := 0; f < config.NumFloors; f++ {
+				if newRequests[f][0] {
+					e.Orders[f][0].ElevatorID = assignedID
+					e.Orders[f][0].Timestamp = time.Now()
+				}
+				if newRequests[f][1] {
+					e.Orders[f][1].ElevatorID = assignedID
+					e.Orders[f][1].Timestamp = time.Now()
+				}
 			}
-			if newRequests[f][1] {
-				e.Orders[f][1].ElevatorID = assignedID
-				e.Orders[f][1].Timestamp = time.Now()
+		*/
+		updateHallOrders(e, newRequests, assignedID)
+
+		if peerID == id {
+			//reflect updated orders in this local elevator's view
+			for f := 0; f < config.NumFloors; f++ {
+				elev.Orders[f][0] = e.Orders[f][0]
+				elev.Orders[f][1] = e.Orders[f][1]
 			}
 		}
 	}
-
 	// Notify FSM
 	elevStateTx <- *elev
 	hallRequestLock.Unlock()
+}
+
+func updateHallOrders(e *elevator.Elevator, newRequests [][2]bool, assignedID int) {
+
+	now := time.Now()
+
+	for floor := 0; floor < config.NumFloors; floor++ {
+		for btn := 0; btn <= 1; btn++ {
+			current := &e.Orders[floor][btn]
+
+			if newRequests[floor][btn] {
+				//update only if this is a new assignment or state was false
+				if !current.State || current.ElevatorID != assignedID {
+					current.State = true
+					current.ElevatorID = assignedID
+					current.Timestamp = now
+				}
+			} else if current.ElevatorID == assignedID {
+				//do not clear it, preserve it
+				continue
+			}
+
+			/*
+				if newRequests[floor][btn] {
+					e.Orders[floor][btn].State = true
+					e.Orders[floor][btn].ElevatorID = assignedID
+					e.Orders[floor][btn].Timestamp = time.Now()
+				} else if e.Orders[floor][btn].ElevatorID == assignedID {
+					continue
+				} else {
+					//set to false only if it was previously assigned to another
+					e.Orders[floor][btn].State = false
+					e.Orders[floor][btn].ElevatorID = 100
+					e.Orders[floor][btn].Timestamp = time.Now()
+				}
+			*/
+		}
+	}
 }

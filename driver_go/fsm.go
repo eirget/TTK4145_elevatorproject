@@ -41,8 +41,8 @@ func fsm(e *elevator.Elevator,
 		case isStopped := <-stop_chan:
 			fsmHandleEmergencyStop(isStopped, e, number_of_floors)
 
-		//case <-time.After(1 * time.Second):
-		//	elevStateTx <- *e
+			//case <-time.After(1 * time.Second):
+			//	elevStateTx <- *e
 		}
 	}
 }
@@ -52,6 +52,7 @@ func fsmHandleRequestButtonPress(a elevio.ButtonEvent, e *elevator.Elevator, ele
 	e.Orders[a.Floor][a.Button].State = true
 	e.Orders[a.Floor][a.Button].Timestamp = time.Now()
 
+	*new_order_flag = true
 	elevStateTx <- *e
 
 	fmt.Println("orders after button press: ", e.Orders)
@@ -59,7 +60,7 @@ func fsmHandleRequestButtonPress(a elevio.ButtonEvent, e *elevator.Elevator, ele
 	if a.Button == elevio.BT_Cab {
 		elevio.SetButtonLamp(a.Button, a.Floor, true)
 	}
-	*new_order_flag = true
+
 }
 
 func fsmHandleIdleState(e *elevator.Elevator, elevStateTx chan elevator.Elevator, doorTimer *time.Timer) {

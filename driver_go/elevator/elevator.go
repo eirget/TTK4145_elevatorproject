@@ -87,7 +87,7 @@ func ElevatorInit(floor_nr int, id int) *Elevator {
 func (e *Elevator) HandleIdleState() {
 	e.LastActive = time.Now()
 	e.Direction, e.Behavior = e.ChooseDirection()
-	
+
 	switch e.Behavior {
 	case EB_Moving:
 		e.StartMoving()
@@ -145,7 +145,7 @@ func (e *Elevator) SetLights() {
 
 func (e *Elevator) HasPendingOrders() bool {
 	for floor := 0; floor < config.NumFloors; floor++ {
-		for btn := 0; btn < config.NumButtons; btn++ {
+		for btn := 0; btn < config.NumButtons-1; btn++ {
 			if e.Orders[floor][btn].State {
 				return true
 			}

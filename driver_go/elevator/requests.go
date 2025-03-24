@@ -66,7 +66,7 @@ func (e *Elevator) ChooseDirection() (elevio.MotorDirection, ElevatorBehavior) {
 		return elevio.MD_Stop, EB_Idle
 	case elevio.MD_Stop:
 		if e.RequestsHere() {
-			return elevio.MD_Stop, EB_Idle  //did say DoorOpen
+			return elevio.MD_Stop, EB_Idle //did say DoorOpen
 		}
 		if e.requestsAbove() {
 			return elevio.MD_Up, EB_Moving
