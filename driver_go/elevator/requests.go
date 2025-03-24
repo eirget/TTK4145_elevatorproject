@@ -30,7 +30,7 @@ func (e *Elevator) requestsBelow() bool {
 }
 
 // requestsHere checks for requests at the current floor.
-func (e *Elevator) requestsHere() bool {
+func (e *Elevator) RequestsHere() bool {
 	for btn := 0; btn < config.NumButtons; btn++ {
 		if e.Orders[e.Floor_nr][btn].State && e.Orders[e.Floor_nr][btn].ElevatorID == e.ID {
 			return true
@@ -39,14 +39,14 @@ func (e *Elevator) requestsHere() bool {
 	return false
 }
 
-// chooseDirection decides the next direction based on the next request
+// chooseDirection decides the next direction based on Orders
 func (e *Elevator) ChooseDirection() (elevio.MotorDirection, ElevatorBehavior) {
 	switch e.Direction {
 	case elevio.MD_Up:
 		if e.requestsAbove() {
 			return elevio.MD_Up, EB_Moving
 		}
-		if e.requestsHere() {
+		if e.RequestsHere() {
 			return elevio.MD_Down, EB_DoorOpen
 		}
 		if e.requestsBelow() {
@@ -57,7 +57,7 @@ func (e *Elevator) ChooseDirection() (elevio.MotorDirection, ElevatorBehavior) {
 		if e.requestsBelow() {
 			return elevio.MD_Down, EB_Moving
 		}
-		if e.requestsHere() {
+		if e.RequestsHere() {
 			return elevio.MD_Up, EB_DoorOpen
 		}
 		if e.requestsAbove() {
@@ -65,8 +65,8 @@ func (e *Elevator) ChooseDirection() (elevio.MotorDirection, ElevatorBehavior) {
 		}
 		return elevio.MD_Stop, EB_Idle
 	case elevio.MD_Stop:
-		if e.requestsHere() {
-			return elevio.MD_Stop, EB_DoorOpen
+		if e.RequestsHere() {
+			return elevio.MD_Stop, EB_Idle //did say DoorOpen
 		}
 		if e.requestsAbove() {
 			return elevio.MD_Up, EB_Moving
@@ -92,7 +92,7 @@ func (e *Elevator) ShouldStop() bool {
 			(e.Orders[e.Floor_nr][BT_Cab].State && e.Orders[e.Floor_nr][BT_Cab].ElevatorID == e.ID) ||
 			!e.requestsAbove()
 	case elevio.MD_Stop:
-		return true
+		return e.RequestsHere()
 	default:
 		return false
 	}

@@ -17,14 +17,25 @@ import (
 func monitorElevatorActivity(e *elev_import.Elevator, runHra chan bool) {
 	ticker := time.NewTicker(1 * time.Second) // Check every second
 	defer ticker.Stop()
+	fmt.Printf("Last active: %v \n: ", e.LastActive)
 	// need to double check with some sort of "heartbeat" if it actually doesnt work, update lastActive if nothing is wrong
 	for range ticker.C {
 		if time.Since(e.LastActive) > 5*time.Second { // Elevator inactive for 5+ seconds
+			fmt.Println("I have been inactive")
 			if e.HasPendingOrders() {
+				fmt.Println("And I have pending orders, calling hall request assigner")
 				runHra <- true // Trigger hall request reassignment
-				return
+				//return
 			}
 		}
+	}
+}
+
+func periodicallySetLights(e *elev_import.Elevator) {
+	ticker := time.NewTicker(100 * time.Millisecond) // Check every second
+	defer ticker.Stop()
+	for range ticker.C {
+		e.SetLights()
 	}
 }
 
@@ -42,8 +53,6 @@ func main() {
 	flag.Parse()
 
 	//cant these just be made inside hra instead?
-	hallRequests := make([][2]bool, config.NumFloors)
-	cabRequests := make([]bool, config.NumFloors)
 
 	//create map to store elevator states for all elevators on system, to backup orders
 	//why string? maybe just decide that all cases of ID should just be string
@@ -88,7 +97,86 @@ func main() {
 
 	go monitorElevatorActivity(elevator, runHra)
 
+	go periodicallySetLights(elevator)
+
 	fmt.Printf("Started elevator system \n")
+
+	go func() {
+
+		for elevRx := range elevStateRx {
+			//update elevator to have newest state of other elevators
+			idStr := strconv.Itoa(elevRx.ID)
+
+			elevatorMapLock.Lock()
+
+			//elevatorMap[idStr] = &elevRx //may have to directly allocate new Elevator pointer
+			//alternative to the above line:
+			copy := elevRx
+			elevatorMap[idStr] = &copy
+
+			if idStr == id {
+				elevator.Orders = elevRx.Orders
+				elevator.LastActive = time.Now()
+				//new_order_flag = true
+			}
+
+			//fmt.Printf("Elevators: %v\n", elevatorMap)
+			//elevatorVar := elevatorMap[idStr]
+			//fmt.Printf("Elevator behavior: %v id: %d", elevatorVar.Behavior, elevatorVar.ID)
+			elevatorMapLock.Unlock()
+
+			//fmt.Printf("Floor_nr: %v\n", a.Floor_nr)
+			//fmt.Printf("Direction %v\n", a.Direction)
+			//fmt.Println("timestamp(hall up): \n", a.Orders[a.Floor_nr][BT_HallUp].Timestamp)
+
+			//NEW, idea for fixing when hall requests should actually be updated
+			//func updateHallRequests(myElevator *Elevator, receivedElev Elevator) {
+			//if idStr != id {
+
+			updated := false
+			for floor := 0; floor < config.NumFloors; floor++ {
+				for btn := 0; btn < config.NumButtons-1; btn++ { // Only HallUp and HallDown
+					// Compare timestamps to ensure only newer updates are accepted
+					if elevRx.Orders[floor][btn].Timestamp.After(elevator.Orders[floor][btn].Timestamp) {
+						elevator.Orders[floor][btn] = elevRx.Orders[floor][btn]
+						updated = true
+					}
+				}
+			}
+			//}
+			if updated {
+				updated = false
+				fmt.Printf("Recieved: \n")
+				fmt.Printf("Message from ID: %v\n", elevRx.Orders[1][2].ElevatorID)
+				for floor := 0; floor < config.NumFloors; floor++ {
+					fmt.Printf("\n Floornr: %+v ", floor)
+					for btn := elevio.ButtonType(0); btn < config.NumButtons; btn++ {
+						fmt.Printf("%+v ", elevRx.Orders[floor][btn].State)
+						fmt.Printf("%+v, ", elevRx.Orders[floor][btn].ElevatorID)
+					}
+				}
+				fmt.Printf("\n")
+				fmt.Printf("Timestamp: %v \n", time.Now())
+
+			}
+
+			elevator.SetLights()
+
+			//if updated {
+			//	elevStateTx <- *elevator
+			//}
+
+			//maybe just usa an UPDATED flag in here. and rebroadcast aand run hra based on this instead
+			if new_order_flag {
+				runHra <- true
+				new_order_flag = false
+			}
+			//fmt.Printf("%+v\n", elevatorMap)
+		}
+	}()
+
+	var latestLost []string
+	var latesetLostMutex sync.Mutex
 
 	for {
 		select {
@@ -98,20 +186,29 @@ func main() {
 			fmt.Printf("  New:      %q\n", peerUpdate.New)
 			fmt.Printf("  Lost:     %q\n", peerUpdate.Lost)
 
+			latesetLostMutex.Lock()
+			latestLost = peerUpdate.Lost
+			latesetLostMutex.Unlock()
+
 			//fixed elevators knowing of eachother even without an event happening
 			if len(peerUpdate.New) != 0 {
 				elevStateTx <- *elevator
-				//when an elevator loses power, but then gets power again AND connects to the internet again it gets is old cad orders back through its whole Orders
+				//when an elevator loses power, but then gets power again AND connects to the internet again it gets its old cab orders back through its whole Orders
 				//the hall call part of Orders in the elevators map should have been updated while it was disconnected also
 				//QUESTION: do we need to have functionality for the case where an elevator loses power, gets power again but does NOT connect back on the Internet? should it still get its cab calls somehow
 				//hra should maybe be run when new and lost change
 				if lastState, exists := elevatorMap[peerUpdate.New]; exists {
 					fmt.Printf("Elevator %s reconnected! Restoring previous orders.\n", peerUpdate.New)
 					elevatorMap[peerUpdate.New].Orders = lastState.Orders // Restore orders
-					elevStateTx <- *elevatorMap[peerUpdate.New]           // Broadcast restored state
+					fmt.Printf("Orders at ID %s: %v", peerUpdate.New, elevatorMap[peerUpdate.New].Orders)
+					elevStateTx <- *elevatorMap[peerUpdate.New] // Broadcast restored state
 				} else {
 					fmt.Printf("Elevator %s is new, initializing.\n", peerUpdate.New)
 				}
+			}
+
+			if len(peerUpdate.Lost) != 0 {
+				runHra <- true
 			}
 
 			//the new part of peers will only include one id, it is not a list, is that ok?
@@ -130,76 +227,54 @@ func main() {
 
 		//is current "heartbeat" functionality enough?
 		//maybe both variable and channel name should include that these are states, maybe change names
-		case elevRx := <-elevStateRx: //can the buffer cause packet loss?
-			//update elevator to have newest state of other elevators
-			idStr := strconv.Itoa(elevRx.ID)
-
-			elevatorMapLock.Lock()
-			elevatorMap[idStr] = &elevRx //may have to directly allocate new Elevator pointer
-			fmt.Printf("Elevators: %v", elevatorMap)
-			elevatorMapLock.Unlock()
-
-			fmt.Printf("Recieved: \n")
-			fmt.Printf("Message from ID: %v\n", elevRx.Orders[1][2].ElevatorID)
-			//fmt.Printf("Floor_nr: %v\n", a.Floor_nr)
-			//fmt.Printf("Direction %v\n", a.Direction)
-			//fmt.Println("timestamp(hall up): \n", a.Orders[a.Floor_nr][BT_HallUp].Timestamp)
-
-			//NEW, idea for fixing when hall requests should actually be updated
-			//func updateHallRequests(myElevator *Elevator, receivedElev Elevator) {
-			//if idStr != id {
-			for floor := 0; floor < config.NumFloors; floor++ {
-				for btn := 0; btn < config.NumButtons-1; btn++ { // Only HallUp and HallDown
-					// Compare timestamps to ensure only newer updates are accepted
-					if elevRx.Orders[floor][btn].Timestamp.After(elevator.Orders[floor][btn].Timestamp) {
-						elevator.Orders[floor][btn] = elevRx.Orders[floor][btn]
-					}
-				}
-			}
-			//}
-
-			/*
-				for floor := 0; floor < config.NumFloors; floor++ {
-					fmt.Printf("\n Floornr: %+v ", floor)
-					for btn := elevio.ButtonType(0); btn < config.NumButtons; btn++ {
-						fmt.Printf("%+v ", elevRx.Orders[floor][btn].State)
-						fmt.Printf("%+v, ", elevRx.Orders[floor][btn].ElevatorID)
-					}
-
-				}
-				fmt.Printf("\n")
-				fmt.Printf("Timestamp: %v \n", time.Now())
-
-				elevator.SetLights()
-
-				if new_order_flag {
-					runHra <- true
-					new_order_flag = false
-				}
-			*/
-
-			//fmt.Printf("%+v\n", elevatorMap)
+		//case elevRx := <-elevStateRx: //can the buffer cause packet loss?
 
 		case <-receiveRunHra:
+
+			//sleep at the beginning of hra? or timer? just something to delay a little bit so that all elevators have latest orders
 
 			//actually create logic that will be correct for all cases
 			fmt.Println("Received runHra signal")
 
-			activeElevators := make(map[string]*elev_import.Elevator)
+			activeElevators := make(map[string]*elev_import.Elevator) //have just in pure main, does this need to be pointers
+			//just empty active elevators here
+
+			fmt.Printf("Elevator map: %v\n", elevatorMap)
 
 			elevatorMapLock.Lock()
 			for id, elev := range elevatorMap {
-				if time.Since(elev.LastActive) < 5*time.Second || !elev.HasPendingOrders() {
-					activeElevators[id] = elev
+				fmt.Printf("Elevator behaviour of id %s before hra: %v\n", id, elev.Behavior)
+				fmt.Printf("Last active of id %v: ", id)
+				fmt.Println(elev.LastActive)
+				fmt.Printf("Time now: %v", time.Now())
+				if contains(latestLost, id) {
+					continue
 				}
+
+				if time.Since(elev.LastActive) < 5*time.Second { //|| !elev.HasPendingOrders() {
+					copy := *elev
+					activeElevators[id] = &copy
+				}
+
 			}
+
+			fmt.Printf("Active elevators: %v\n", activeElevators)
 			elevatorMapLock.Unlock()
 
-			go hallRequestAssigner(elevator, activeElevators, id, hallRequests, cabRequests, hraExecutable, elevStateRx)
+			go hallRequestAssigner(elevator, elevatorMap, activeElevators, id, hraExecutable, elevStateRx)
 
 			//might not be neccessary at all
 			//case <-time.After(500 * time.Millisecond):
 			//	elevStateTx <- *elevator
 		}
 	}
+}
+
+func contains(slice []string, item string) bool {
+	for _, v := range slice {
+		if v == item {
+			return true
+		}
+	}
+	return false
 }

@@ -26,14 +26,14 @@ func fsm(e *elevator.Elevator,
 			fsmHandleRequestButtonPress(newReq, e, elevStateTx, &new_order_flag)
 
 		case <-time.After(100 * time.Millisecond):
-			fsmHandleIdleState(e, doorTimer)
+			fsmHandleIdleState(e, elevStateTx, doorTimer)
 
 		case newFloor := <-new_floor_chan:
 			fsmHandleNewFloor(newFloor, e, elevStateTx, doorTimer)
 
 		case <-doorTimer.C:
 			fsmHandleDoorTimeout(e, doorTimer)
-
+		//maybe name obstructionState? I misunderstood this variable name
 		case isObstructed := <-obstr_chan:
 			fmt.Println("Obstruction happened")
 			fsmHandleObstruction(isObstructed, e)
@@ -41,8 +41,8 @@ func fsm(e *elevator.Elevator,
 		case isStopped := <-stop_chan:
 			fsmHandleEmergencyStop(isStopped, e, number_of_floors)
 
-		case <-time.After(1 * time.Second):
-			e.SetLights()
+			//case <-time.After(1 * time.Second):
+			//	elevStateTx <- *e
 		}
 	}
 }
@@ -52,6 +52,7 @@ func fsmHandleRequestButtonPress(a elevio.ButtonEvent, e *elevator.Elevator, ele
 	e.Orders[a.Floor][a.Button].State = true
 	e.Orders[a.Floor][a.Button].Timestamp = time.Now()
 
+	*new_order_flag = true
 	elevStateTx <- *e
 
 	fmt.Println("orders after button press: ", e.Orders)
@@ -59,16 +60,24 @@ func fsmHandleRequestButtonPress(a elevio.ButtonEvent, e *elevator.Elevator, ele
 	if a.Button == elevio.BT_Cab {
 		elevio.SetButtonLamp(a.Button, a.Floor, true)
 	}
-	*new_order_flag = true
+
 }
 
-func fsmHandleIdleState(e *elevator.Elevator, doorTimer *time.Timer) {
+func fsmHandleIdleState(e *elevator.Elevator, elevStateTx chan elevator.Elevator, doorTimer *time.Timer) {
+	//DENNE IF'EN ER NY
 	if e.Behavior == elevator.EB_Idle {
+		if e.ShouldStop() {
+			fmt.Println("Reopening at same floor to serve additional order")
+			e.StopAtFloor()
+			doorTimer.Reset(3 * time.Second)
+			return
+		}
 		e.HandleIdleState()
 		if e.Behavior == elevator.EB_DoorOpen {
 			doorTimer.Reset(5 * time.Second)
 		}
 	}
+	elevStateTx <- *e
 }
 
 func fsmHandleNewFloor(a int, e *elevator.Elevator, elevStateTx chan elevator.Elevator, doorTimer *time.Timer) {
@@ -88,6 +97,8 @@ func fsmHandleDoorTimeout(e *elevator.Elevator, doorTimer *time.Timer) {
 		fmt.Println("Waiting for obstruction to clear...")
 		doorTimer.Reset(500 * time.Millisecond)
 	} else {
+		fmt.Println("Close door and resume called")
+		// might have to fix the two-hall-call-problem here
 		e.CloseDoorAndResume()
 	}
 }
