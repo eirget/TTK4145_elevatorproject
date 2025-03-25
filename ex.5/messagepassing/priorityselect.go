@@ -35,28 +35,31 @@ type Resource struct {
 }
 
 func resourceManager(takeLow chan Resource, takeHigh chan Resource, giveBack chan Resource) {
-
 	res := Resource{}
+	busy := false
 
 	for {
-		//Prøv å sende til en høyprioriteringskanal først:
-		select {
-		case res = <-giveBack:
-		}
-
-		//Hvis ingen høyprioriteringskanal venter, ta en lavprioritetsbruker
-		for {
+		if !busy {
+			// Try to give resource to high-priority users first
 			select {
 			case takeHigh <- res:
-				continue
+				busy = true
 			default:
+				// If no high-priority users, try low
+				select {
+				case takeHigh <- res:
+					busy = true
+				case takeLow <- res:
+					busy = true
+				case r := <-giveBack:
+					res = r
+				}
 			}
-			break
-		}
-
-		select {
-		case takeLow <- res:
-		case takeHigh <- res:
+		} else {
+			// Wait until someone returns the resource
+			r := <-giveBack
+			res = r
+			busy = false
 		}
 	}
 }
