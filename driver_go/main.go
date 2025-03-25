@@ -52,7 +52,9 @@ func main() {
 	flag.StringVar(&port, "port", "", "port of this peer")
 	flag.Parse()
 
-	//cant these just be made inside hra instead?
+	//NEW
+	var disconnectedFromNetwork = true //assume until proven otherwise
+	var disconnectedMutex sync.RWMutex
 
 	//create map to store elevator states for all elevators on system, to backup orders
 	//why string? maybe just decide that all cases of ID should just be string
@@ -190,6 +192,11 @@ func main() {
 			latestLost = peerUpdate.Lost
 			latesetLostMutex.Unlock()
 
+			//NEW
+			disconnectedMutex.Lock()
+			disconnectedFromNetwork = len(peerUpdate.Peers) == 0
+			disconnectedMutex.Unlock()
+
 			//fixed elevators knowing of eachother even without an event happening
 			if len(peerUpdate.New) != 0 {
 				elevStateTx <- *elevator
@@ -236,6 +243,18 @@ func main() {
 			//actually create logic that will be correct for all cases
 			fmt.Println("Received runHra signal")
 
+			//NEW
+			disconnectedMutex.RLock()
+			isDisconnected := disconnectedFromNetwork
+			disconnectedMutex.RUnlock()
+
+			if isDisconnected {
+				fmt.Println("Alone mode: assigning all hall requests to self")
+				assignAllHallCallsToSelf(elevator)
+				elevStateTx <- *elevator //why?
+				continue
+			}
+
 			activeElevators := make(map[string]*elev_import.Elevator) //have just in pure main, does this need to be pointers
 			//just empty active elevators here
 
@@ -277,4 +296,15 @@ func contains(slice []string, item string) bool {
 		}
 	}
 	return false
+}
+
+func assignAllHallCallsToSelf(e *elev_import.Elevator) {
+	for floor := 0; floor < config.NumFloors; floor++ {
+		for btn := 0; btn <= 1; btn++ { // HallUp and HallDown only
+			if e.Orders[floor][btn].State {
+				e.Orders[floor][btn].ElevatorID = e.ID
+				e.Orders[floor][btn].Timestamp = time.Now()
+			}
+		}
+	}
 }
