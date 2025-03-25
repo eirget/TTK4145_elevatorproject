@@ -116,67 +116,58 @@ func (e *Elevator) ClearAtCurrentFloor() {
 
 		switch e.Direction {
 		case elevio.MD_Up:
-			//fmt.Println("Clearing HallUp at Floor", e.Floor_nr)
-			e.Orders[e.Floor_nr][BT_HallUp].State = false
-			e.Orders[e.Floor_nr][BT_HallUp].Timestamp = time.Now()
-			e.Orders[e.Floor_nr][BT_HallUp].ElevatorID = 100
 
-			if !e.requestsAbove() {
-				//fmt.Println("Clearing HallDown at Floor", e.Floor_nr)
+			if e.Orders[e.Floor_nr][BT_HallUp].State {
+				e.Orders[e.Floor_nr][BT_HallUp].State = false
+				e.Orders[e.Floor_nr][BT_HallUp].Timestamp = time.Now()
+				e.Orders[e.Floor_nr][BT_HallUp].ElevatorID = 100
+			}
+
+			nextDir, _ := e.ChooseDirection()
+			if nextDir == elevio.MD_Down && e.Orders[e.Floor_nr][BT_HallDown].State {
 				e.Orders[e.Floor_nr][BT_HallDown].State = false
 				e.Orders[e.Floor_nr][BT_HallDown].Timestamp = time.Now()
 				e.Orders[e.Floor_nr][BT_HallDown].ElevatorID = 100
 			}
+
 		case elevio.MD_Down:
 			//fmt.Println("Clearing HallDown at Floor", e.Floor_nr)
-			e.Orders[e.Floor_nr][BT_HallDown].State = false
-			e.Orders[e.Floor_nr][BT_HallDown].Timestamp = time.Now()
-			e.Orders[e.Floor_nr][BT_HallDown].ElevatorID = 100
+			if e.Orders[e.Floor_nr][BT_HallDown].State {
+				e.Orders[e.Floor_nr][BT_HallDown].State = false
+				e.Orders[e.Floor_nr][BT_HallDown].Timestamp = time.Now()
+				e.Orders[e.Floor_nr][BT_HallDown].ElevatorID = 100
+			}
 
-			if !e.requestsBelow() {
-				//fmt.Println("Clearing HallUp at Floor", e.Floor_nr)
+			nextDir, _ := e.ChooseDirection()
+			if nextDir == elevio.MD_Up && e.Orders[e.Floor_nr][BT_HallUp].State {
 				e.Orders[e.Floor_nr][BT_HallUp].State = false
 				e.Orders[e.Floor_nr][BT_HallUp].Timestamp = time.Now()
 				e.Orders[e.Floor_nr][BT_HallUp].ElevatorID = 100
 			}
 		case elevio.MD_Stop:
-			// Serve only one hall call at a time
-			if e.Orders[e.Floor_nr][BT_HallUp].State && e.Orders[e.Floor_nr][BT_HallDown].State {
-				if e.Orders[e.Floor_nr][BT_HallDown].Timestamp.After(e.Orders[e.Floor_nr][BT_HallUp].Timestamp) {
-					// Serve UP first
-					e.Orders[e.Floor_nr][BT_HallUp].State = false
-					e.Orders[e.Floor_nr][BT_HallUp].Timestamp = time.Now()
-					e.Orders[e.Floor_nr][BT_HallUp].ElevatorID = 100
+			hasUp := e.Orders[e.Floor_nr][BT_HallUp].State
+			hasDown := e.Orders[e.Floor_nr][BT_HallDown].State
 
-					e.PendingSecondCall = true
-				} else {
-					// Serve DOWN first
-					e.Orders[e.Floor_nr][BT_HallDown].State = false
-					e.Orders[e.Floor_nr][BT_HallDown].Timestamp = time.Now()
-					e.Orders[e.Floor_nr][BT_HallDown].ElevatorID = 100
-
-					e.PendingSecondCall = true
-				}
-				return
-			}
-
-			// If only one is active
-			if e.Orders[e.Floor_nr][BT_HallUp].State {
+			switch {
+			case hasUp && e.requestsAbove():
 				e.Orders[e.Floor_nr][BT_HallUp].State = false
 				e.Orders[e.Floor_nr][BT_HallUp].Timestamp = time.Now()
 				e.Orders[e.Floor_nr][BT_HallUp].ElevatorID = 100
-				return
-			}
-
-			if e.Orders[e.Floor_nr][BT_HallDown].State {
+			case hasUp:
+				e.Orders[e.Floor_nr][BT_HallUp].State = false
+				e.Orders[e.Floor_nr][BT_HallUp].Timestamp = time.Now()
+				e.Orders[e.Floor_nr][BT_HallUp].ElevatorID = 100
+			case hasDown && e.requestsBelow():
 				e.Orders[e.Floor_nr][BT_HallDown].State = false
 				e.Orders[e.Floor_nr][BT_HallDown].Timestamp = time.Now()
 				e.Orders[e.Floor_nr][BT_HallDown].ElevatorID = 100
-				return
+			case hasDown:
+				e.Orders[e.Floor_nr][BT_HallDown].State = false
+				e.Orders[e.Floor_nr][BT_HallDown].Timestamp = time.Now()
+				e.Orders[e.Floor_nr][BT_HallDown].ElevatorID = 100
 			}
 		}
 	}
-	//fmt.Printf("After Clearing: Orders at Floor %d: %+v\n", e.Floor_nr, e.Orders[e.Floor_nr])
 }
 
 func AssignAllHallCallsToSelf(e *Elevator) {

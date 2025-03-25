@@ -29,17 +29,17 @@ const (
 
 type Elevator struct {
 	//mutex over states maybe to protect
-	ID                int
-	Floor_nr          int
-	Direction         elevio.MotorDirection
-	On_floor          bool
-	Door_open         bool
-	Obstruction       bool
-	Orders            [4][3]OrderType
-	Behavior          ElevatorBehavior
-	LastActive        time.Time
-	PendingSecondCall bool // NEW
-	Config            Config
+	ID          int
+	Floor_nr    int
+	Direction   elevio.MotorDirection
+	On_floor    bool
+	Door_open   bool
+	Obstruction bool
+	Orders      [4][3]OrderType
+	Behavior    ElevatorBehavior
+	JustStopped bool
+	LastActive  time.Time
+	Config      Config
 }
 
 var DirectionMap = map[elevio.MotorDirection]string{
@@ -114,6 +114,7 @@ func (e *Elevator) OpenDoor() {
 }
 
 func (e *Elevator) StopAtFloor() {
+	e.JustStopped = true
 	e.LastActive = time.Now()
 	e.Direction = elevio.MD_Stop // Stop the motor
 	e.Behavior = EB_DoorOpen     // Set state to door open
@@ -125,7 +126,6 @@ func (e *Elevator) StopAtFloor() {
 func (e *Elevator) CloseDoorAndResume() {
 	e.LastActive = time.Now()
 	e.Behavior = EB_Idle
-	e.PendingSecondCall = false // NEW
 	elevio.SetDoorOpenLamp(false)
 	e.Direction, e.Behavior = e.ChooseDirection()
 	elevio.SetMotorDirection(e.Direction)

@@ -68,14 +68,16 @@ func fsmHandleIdleState(e *elevator.Elevator, elevStateTx chan elevator.Elevator
 	//DENNE IF'EN ER NY
 
 	if e.Behavior == elevator.EB_Idle {
-		/*
-			if e.ShouldStop() {
-				fmt.Println("Reopening at same floor to serve additional order")
-				e.StopAtFloor()
-				doorTimer.Reset(3 * time.Second)
-				return
-			}
-		*/
+		if e.JustStopped {
+			e.JustStopped = false
+			return
+		}
+		if e.ShouldStop() {
+			fmt.Println("Reopening at same floor to serve additional order")
+			e.StopAtFloor()
+			doorTimer.Reset(3 * time.Second)
+			return
+		}
 		e.HandleIdleState()
 		if e.Behavior == elevator.EB_DoorOpen {
 			doorTimer.Reset(5 * time.Second)
@@ -101,22 +103,6 @@ func fsmHandleDoorTimeout(e *elevator.Elevator, doorTimer *time.Timer) {
 		fmt.Println("Waiting for obstruction to clear...")
 		doorTimer.Reset(500 * time.Millisecond)
 		return
-	}
-
-	if e.PendingSecondCall { //NEW
-		// Check if the other direction call is still active
-		if e.ShouldReopenForSecondCall() {
-			fmt.Println("Reopening for second hall call...")
-			e.Behavior = elevator.EB_DoorOpen
-			elevio.SetDoorOpenLamp(true)
-			e.ClearAtCurrentFloor()
-			e.PendingSecondCall = false
-			doorTimer.Reset(3 * time.Second)
-			return
-		}
-
-		// If the second call was cleared already, just move on
-		e.PendingSecondCall = false
 	}
 
 	fmt.Println("Close door and resume called")
