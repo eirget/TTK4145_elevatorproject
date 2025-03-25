@@ -33,7 +33,7 @@ func fsm(e *elevator.Elevator,
 			fsmHandleNewFloor(newFloor, e, elevStateTx, doorTimer)
 
 		case <-doorTimer.C:
-			fsmHandleDoorTimeout(e, doorTimer)
+			fsmHandleDoorTimeout(e, doorTimer, elevStateTx)
 		//maybe name obstructionState? I misunderstood this variable name
 		case isObstructed := <-obstr_chan:
 			fmt.Println("Obstruction happened")
@@ -65,22 +65,24 @@ func fsmHandleRequestButtonPress(a elevio.ButtonEvent, e *elevator.Elevator, ele
 }
 
 func fsmHandleIdleState(e *elevator.Elevator, elevStateTx chan elevator.Elevator, doorTimer *time.Timer) {
-	//DENNE IF'EN ER NY
-
 	if e.Behavior == elevator.EB_Idle {
-		if e.JustStopped {
-			e.JustStopped = false
-			return
-		}
-		if e.ShouldStop() {
-			fmt.Println("Reopening at same floor to serve additional order")
-			e.StopAtFloor()
-			doorTimer.Reset(3 * time.Second)
-			return
-		}
+		//this will probably never be added again
+		/*
+				if e.JustStopped {
+					e.JustStopped = false
+					return
+				}
+
+			if e.ShouldStop() {
+				fmt.Println("Reopening at same floor to serve additional order")
+				e.StopAtFloor()
+				doorTimer.Reset(3 * time.Second)
+				return
+			}
+		*/
 		e.HandleIdleState()
 		if e.Behavior == elevator.EB_DoorOpen {
-			doorTimer.Reset(5 * time.Second)
+			doorTimer.Reset(3 * time.Second)
 		}
 	}
 	elevStateTx <- *e
@@ -90,6 +92,7 @@ func fsmHandleNewFloor(a int, e *elevator.Elevator, elevStateTx chan elevator.El
 	e.Floor_nr = a
 	elevio.SetFloorIndicator(a)
 
+	//ShouldStop returns true if it has pending orders in its current direction, or if you just in general have no reason to continue in your current direction
 	if e.ShouldStop() {
 		e.StopAtFloor()
 		doorTimer.Reset(3 * time.Second)
@@ -98,15 +101,20 @@ func fsmHandleNewFloor(a int, e *elevator.Elevator, elevStateTx chan elevator.El
 	elevStateTx <- *e
 }
 
-func fsmHandleDoorTimeout(e *elevator.Elevator, doorTimer *time.Timer) {
+func fsmHandleDoorTimeout(e *elevator.Elevator, doorTimer *time.Timer, elevStateTx chan elevator.Elevator) {
+	if e.ShouldReopenForOppositeHallCall() {
+		e.StopAtFloor()
+		doorTimer.Reset(3 * time.Second)
+		return
+	}
 	if e.Obstruction {
 		fmt.Println("Waiting for obstruction to clear...")
 		doorTimer.Reset(500 * time.Millisecond)
 		return
 	}
-
 	fmt.Println("Close door and resume called")
 	e.CloseDoorAndResume()
+	elevStateTx <- *e
 }
 
 func fsmHandleObstruction(isObstructed bool, e *elevator.Elevator) {

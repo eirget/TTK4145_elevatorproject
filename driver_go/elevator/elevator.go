@@ -29,17 +29,17 @@ const (
 
 type Elevator struct {
 	//mutex over states maybe to protect
-	ID          int
-	Floor_nr    int
-	Direction   elevio.MotorDirection
-	On_floor    bool
-	Door_open   bool
-	Obstruction bool
-	Orders      [4][3]OrderType
-	Behavior    ElevatorBehavior
-	JustStopped bool
-	LastActive  time.Time
-	Config      Config
+	ID            int
+	Floor_nr      int
+	Direction     elevio.MotorDirection
+	LastDirection elevio.MotorDirection //NEW
+	On_floor      bool
+	Door_open     bool
+	Obstruction   bool
+	Orders        [4][3]OrderType
+	Behavior      ElevatorBehavior
+	LastActive    time.Time
+	Config        Config
 }
 
 var DirectionMap = map[elevio.MotorDirection]string{
@@ -114,10 +114,10 @@ func (e *Elevator) OpenDoor() {
 }
 
 func (e *Elevator) StopAtFloor() {
-	e.JustStopped = true
 	e.LastActive = time.Now()
-	e.Direction = elevio.MD_Stop // Stop the motor
-	e.Behavior = EB_DoorOpen     // Set state to door open
+	e.LastDirection = e.Direction //NEW
+	e.Direction = elevio.MD_Stop  // Stop the motor
+	e.Behavior = EB_DoorOpen      // Set state to door open
 	elevio.SetMotorDirection(e.Direction)
 	elevio.SetDoorOpenLamp(true)
 	e.ClearAtCurrentFloor()
@@ -156,19 +156,17 @@ func (e *Elevator) HasPendingOrders() bool {
 }
 
 // NEW
-func (e *Elevator) ShouldReopenForSecondCall() bool {
-	// Elevator is stopped — check what its next direction will be
-	dir, _ := e.ChooseDirection()
-
-	if dir == elevio.MD_Up {
-		return e.Orders[e.Floor_nr][BT_HallUp].State &&
-			e.Orders[e.Floor_nr][BT_HallUp].ElevatorID == e.ID
-	}
-
-	if dir == elevio.MD_Down {
+func (e *Elevator) ShouldReopenForOppositeHallCall() bool {
+	switch e.LastDirection {
+	case elevio.MD_Up:
 		return e.Orders[e.Floor_nr][BT_HallDown].State &&
-			e.Orders[e.Floor_nr][BT_HallDown].ElevatorID == e.ID
+			!e.requestsAbove() &&
+			e.requestsBelow()
+	case elevio.MD_Down:
+		return e.Orders[e.Floor_nr][BT_HallUp].State &&
+			!e.requestsBelow() &&
+			e.requestsAbove()
+	default:
+		return false
 	}
-
-	return false
 }

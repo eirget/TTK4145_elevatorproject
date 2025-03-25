@@ -26,7 +26,6 @@ type HRAInput struct {
 }
 
 func hallRequestAssigner(elev *elevator.Elevator,
-	elevatorMap map[string]*elevator.Elevator,
 	activeElevators map[string]*elevator.Elevator,
 	id string,
 	hraExecutable string,

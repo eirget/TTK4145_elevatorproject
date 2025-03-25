@@ -144,7 +144,7 @@ func main() {
 			//	elevStateTx <- *elevator
 			//}
 
-			//maybe just usa an UPDATED flag in here. and rebroadcast aand run hra based on this instead
+			//maybe just use an UPDATED flag in here. and rebroadcast aand run hra based on this instead
 			if newOrderFlag {
 				runHraCh <- true
 				newOrderFlag = false
@@ -256,7 +256,7 @@ func main() {
 			fmt.Printf("Active elevators: %v\n", activeElevators)
 			elevatorMapLock.Unlock()
 
-			go hallRequestAssigner(localElevator, elevatorMap, activeElevators, id, hraExecutable, elevStateRx)
+			go hallRequestAssigner(localElevator, activeElevators, id, hraExecutable, elevStateRx)
 
 			//might not be neccessary at all
 			//case <-time.After(500 * time.Millisecond):

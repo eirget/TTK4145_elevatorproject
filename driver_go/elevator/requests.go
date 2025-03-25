@@ -98,73 +98,36 @@ func (e *Elevator) ShouldStop() bool {
 	}
 }
 
+// UPDATED
 // clearAtCurrentFloor clears requests at the current floor.
 func (e *Elevator) ClearAtCurrentFloor() {
-	//fmt.Printf("Before Clearing: Orders at Floor %d: %+v\n", e.Floor_nr, e.Orders[e.Floor_nr])
-
 	switch e.Config.ClearRequestVariant {
 	case CV_All:
 		for btn := 0; btn < config.NumButtons; btn++ {
 			if e.Orders[e.Floor_nr][btn].ElevatorID == e.ID {
 				e.Orders[e.Floor_nr][btn].State = false
+				e.Orders[e.Floor_nr][btn].Timestamp = time.Now()
 			}
 		}
+
 	case CV_InDirn:
-		//fmt.Println("Clearing CAB order at Floor", e.Floor_nr)
-		e.Orders[e.Floor_nr][BT_Cab].State = false
-		e.Orders[e.Floor_nr][BT_Cab].Timestamp = time.Now()
+		// Always clear cab call
+		if e.Orders[e.Floor_nr][BT_Cab].ElevatorID == e.ID {
+			e.Orders[e.Floor_nr][BT_Cab].State = false
+			e.Orders[e.Floor_nr][BT_Cab].Timestamp = time.Now()
+		}
 
-		switch e.Direction {
+		// Clear hall call in the direction we just came from
+		switch e.LastDirection {
 		case elevio.MD_Up:
-
-			if e.Orders[e.Floor_nr][BT_HallUp].State {
+			if e.Orders[e.Floor_nr][BT_HallUp].ElevatorID == e.ID {
 				e.Orders[e.Floor_nr][BT_HallUp].State = false
 				e.Orders[e.Floor_nr][BT_HallUp].Timestamp = time.Now()
-				e.Orders[e.Floor_nr][BT_HallUp].ElevatorID = 100
 			}
-
-			nextDir, _ := e.ChooseDirection()
-			if nextDir == elevio.MD_Down && e.Orders[e.Floor_nr][BT_HallDown].State {
-				e.Orders[e.Floor_nr][BT_HallDown].State = false
-				e.Orders[e.Floor_nr][BT_HallDown].Timestamp = time.Now()
-				e.Orders[e.Floor_nr][BT_HallDown].ElevatorID = 100
-			}
-
 		case elevio.MD_Down:
-			//fmt.Println("Clearing HallDown at Floor", e.Floor_nr)
-			if e.Orders[e.Floor_nr][BT_HallDown].State {
+			if e.Orders[e.Floor_nr][BT_HallDown].ElevatorID == e.ID {
 				e.Orders[e.Floor_nr][BT_HallDown].State = false
 				e.Orders[e.Floor_nr][BT_HallDown].Timestamp = time.Now()
-				e.Orders[e.Floor_nr][BT_HallDown].ElevatorID = 100
-			}
-
-			nextDir, _ := e.ChooseDirection()
-			if nextDir == elevio.MD_Up && e.Orders[e.Floor_nr][BT_HallUp].State {
-				e.Orders[e.Floor_nr][BT_HallUp].State = false
-				e.Orders[e.Floor_nr][BT_HallUp].Timestamp = time.Now()
-				e.Orders[e.Floor_nr][BT_HallUp].ElevatorID = 100
-			}
-		case elevio.MD_Stop:
-			hasUp := e.Orders[e.Floor_nr][BT_HallUp].State
-			hasDown := e.Orders[e.Floor_nr][BT_HallDown].State
-
-			switch {
-			case hasUp && e.requestsAbove():
-				e.Orders[e.Floor_nr][BT_HallUp].State = false
-				e.Orders[e.Floor_nr][BT_HallUp].Timestamp = time.Now()
-				e.Orders[e.Floor_nr][BT_HallUp].ElevatorID = 100
-			case hasUp:
-				e.Orders[e.Floor_nr][BT_HallUp].State = false
-				e.Orders[e.Floor_nr][BT_HallUp].Timestamp = time.Now()
-				e.Orders[e.Floor_nr][BT_HallUp].ElevatorID = 100
-			case hasDown && e.requestsBelow():
-				e.Orders[e.Floor_nr][BT_HallDown].State = false
-				e.Orders[e.Floor_nr][BT_HallDown].Timestamp = time.Now()
-				e.Orders[e.Floor_nr][BT_HallDown].ElevatorID = 100
-			case hasDown:
-				e.Orders[e.Floor_nr][BT_HallDown].State = false
-				e.Orders[e.Floor_nr][BT_HallDown].Timestamp = time.Now()
-				e.Orders[e.Floor_nr][BT_HallDown].ElevatorID = 100
 			}
 		}
 	}
