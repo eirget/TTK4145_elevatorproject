@@ -7,7 +7,8 @@ import (
 	"time"
 )
 
-var new_order_flag bool
+// burde kanksje lages i main
+var newOrderFlag bool
 
 func fsm(e *elevator.Elevator,
 	elevStateTx chan elevator.Elevator,
@@ -23,7 +24,7 @@ func fsm(e *elevator.Elevator,
 	for {
 		select {
 		case newReq := <-req_chan:
-			fsmHandleRequestButtonPress(newReq, e, elevStateTx, &new_order_flag)
+			fsmHandleRequestButtonPress(newReq, e, elevStateTx, &newOrderFlag)
 
 		case <-time.After(100 * time.Millisecond):
 			fsmHandleIdleState(e, elevStateTx, doorTimer)
@@ -65,13 +66,16 @@ func fsmHandleRequestButtonPress(a elevio.ButtonEvent, e *elevator.Elevator, ele
 
 func fsmHandleIdleState(e *elevator.Elevator, elevStateTx chan elevator.Elevator, doorTimer *time.Timer) {
 	//DENNE IF'EN ER NY
+
 	if e.Behavior == elevator.EB_Idle {
-		if e.ShouldStop() {
-			fmt.Println("Reopening at same floor to serve additional order")
-			e.StopAtFloor()
-			doorTimer.Reset(3 * time.Second)
-			return
-		}
+		/*
+			if e.ShouldStop() {
+				fmt.Println("Reopening at same floor to serve additional order")
+				e.StopAtFloor()
+				doorTimer.Reset(3 * time.Second)
+				return
+			}
+		*/
 		e.HandleIdleState()
 		if e.Behavior == elevator.EB_DoorOpen {
 			doorTimer.Reset(5 * time.Second)
@@ -96,11 +100,27 @@ func fsmHandleDoorTimeout(e *elevator.Elevator, doorTimer *time.Timer) {
 	if e.Obstruction {
 		fmt.Println("Waiting for obstruction to clear...")
 		doorTimer.Reset(500 * time.Millisecond)
-	} else {
-		fmt.Println("Close door and resume called")
-		// might have to fix the two-hall-call-problem here
-		e.CloseDoorAndResume()
+		return
 	}
+
+	if e.PendingSecondCall { //NEW
+		// Check if the other direction call is still active
+		if e.ShouldReopenForSecondCall() {
+			fmt.Println("Reopening for second hall call...")
+			e.Behavior = elevator.EB_DoorOpen
+			elevio.SetDoorOpenLamp(true)
+			e.ClearAtCurrentFloor()
+			e.PendingSecondCall = false
+			doorTimer.Reset(3 * time.Second)
+			return
+		}
+
+		// If the second call was cleared already, just move on
+		e.PendingSecondCall = false
+	}
+
+	fmt.Println("Close door and resume called")
+	e.CloseDoorAndResume()
 }
 
 func fsmHandleObstruction(isObstructed bool, e *elevator.Elevator) {
