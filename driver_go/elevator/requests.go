@@ -66,17 +66,16 @@ func (e *Elevator) ChooseDirection() (elevio.MotorDirection, ElevatorBehavior) {
 		}
 		return elevio.MD_Stop, EB_Idle
 	case elevio.MD_Stop:
-		if e.RequestsHere() {
-			//if e.LastDirection
-			return elevio.MD_Stop, EB_DoorOpen
-		}
 		if e.requestsAbove() {
 			return elevio.MD_Up, EB_Moving
 		}
 		if e.requestsBelow() {
 			return elevio.MD_Down, EB_Moving
 		}
-
+		if e.RequestsHere() {
+			//if e.LastDirection
+			return elevio.MD_Stop, EB_DoorOpen
+		}
 		return elevio.MD_Stop, EB_Idle
 	default:
 		return elevio.MD_Stop, EB_Idle
@@ -149,17 +148,6 @@ func (e *Elevator) ClearAtCurrentFloor() {
 				e.Orders[e.Floor_nr][BT_HallUp].ElevatorID = 100
 			}
 		case elevio.MD_Stop:
-			for _, btn := range []int{BT_HallUp, BT_HallDown} {
-				if e.Orders[e.Floor_nr][btn].ElevatorID == e.ID {
-					e.Orders[e.Floor_nr][btn].State = false
-					e.Orders[e.Floor_nr][btn].Timestamp = time.Now()
-					e.Orders[e.Floor_nr][btn].ElevatorID = 100
-				}
-			}
-
-		}
-
-		/*
 			// Clear hall call in the direction we just came from
 			switch e.LastDirection {
 			case elevio.MD_Up:
@@ -167,15 +155,28 @@ func (e *Elevator) ClearAtCurrentFloor() {
 					e.Orders[e.Floor_nr][BT_HallUp].State = false
 					e.Orders[e.Floor_nr][BT_HallUp].Timestamp = time.Now()
 					e.Orders[e.Floor_nr][BT_HallUp].ElevatorID = 100
+				} else if e.Orders[e.Floor_nr][BT_HallDown].ElevatorID == e.ID {
+					e.Orders[e.Floor_nr][BT_HallDown].State = false
+					e.Orders[e.Floor_nr][BT_HallDown].Timestamp = time.Now()
+					e.Orders[e.Floor_nr][BT_HallDown].ElevatorID = 100
 				}
 			case elevio.MD_Down:
 				if e.Orders[e.Floor_nr][elevio.BT_HallDown].State && e.Orders[e.Floor_nr][BT_HallDown].ElevatorID == e.ID {
 					e.Orders[e.Floor_nr][BT_HallDown].State = false
 					e.Orders[e.Floor_nr][BT_HallDown].Timestamp = time.Now()
 					e.Orders[e.Floor_nr][BT_HallDown].ElevatorID = 100
+				} else if e.Orders[e.Floor_nr][BT_HallUp].ElevatorID == e.ID {
+					e.Orders[e.Floor_nr][BT_HallUp].State = false
+					e.Orders[e.Floor_nr][BT_HallUp].Timestamp = time.Now()
+					e.Orders[e.Floor_nr][BT_HallUp].ElevatorID = 100
 				}
 			}
-		*/
+
+		}
+
+		/*
+
+		 */
 	}
 }
 
