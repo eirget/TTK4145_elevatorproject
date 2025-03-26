@@ -66,16 +66,31 @@ func (e *Elevator) ChooseDirection() (elevio.MotorDirection, ElevatorBehavior) {
 		}
 		return elevio.MD_Stop, EB_Idle
 	case elevio.MD_Stop:
-		if e.requestsAbove() {
-			return elevio.MD_Up, EB_Moving
+		switch e.LastDirection {
+		case elevio.MD_Up:
+			if e.requestsAbove() {
+				return elevio.MD_Up, EB_Moving
+			}
+			if e.requestsBelow() {
+				return elevio.MD_Down, EB_Moving
+			}
+			if e.RequestsHere() {
+				//if e.LastDirection
+				return elevio.MD_Stop, EB_DoorOpen
+			}
+		case elevio.MD_Down:
+			if e.requestsBelow() {
+				return elevio.MD_Down, EB_Moving
+			}
+			if e.requestsAbove() {
+				return elevio.MD_Up, EB_Moving
+			}
+			if e.RequestsHere() {
+				//if e.LastDirection
+				return elevio.MD_Stop, EB_DoorOpen
+			}
 		}
-		if e.requestsBelow() {
-			return elevio.MD_Down, EB_Moving
-		}
-		if e.RequestsHere() {
-			//if e.LastDirection
-			return elevio.MD_Stop, EB_DoorOpen
-		}
+
 		return elevio.MD_Stop, EB_Idle
 	default:
 		return elevio.MD_Stop, EB_Idle
@@ -171,7 +186,6 @@ func (e *Elevator) ClearAtCurrentFloor() {
 					e.Orders[e.Floor_nr][BT_HallUp].ElevatorID = 100
 				}
 			}
-
 		}
 
 		/*

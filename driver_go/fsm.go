@@ -42,8 +42,8 @@ func fsm(e *elevator.Elevator,
 		case isStopped := <-stop_chan:
 			fsmHandleEmergencyStop(isStopped, e, number_of_floors)
 
-			//case <-time.After(1 * time.Second):
-			//	elevStateTx <- *e
+			//case <-time.After(100 * time.Millisecond):
+			//elevStateTx <- *e
 		}
 	}
 }
@@ -102,7 +102,7 @@ func fsmHandleDoorTimeout(e *elevator.Elevator, doorTimer *time.Timer, elevState
 
 		if e.LastDirection == elevio.MD_Up {
 			e.LastDirection = elevio.MD_Down
-		} else if e.LastDirection == elevio.MD_Down{
+		} else if e.LastDirection == elevio.MD_Down {
 			e.LastDirection = elevio.MD_Up
 		}
 

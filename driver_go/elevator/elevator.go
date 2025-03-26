@@ -67,12 +67,13 @@ const (
 
 func ElevatorInit(floor_nr int, id int) *Elevator {
 	return &Elevator{
-		ID:          id,
-		Floor_nr:    floor_nr,
-		Direction:   elevio.MD_Stop,
-		On_floor:    true,
-		Door_open:   false,
-		Obstruction: false,
+		ID:            id,
+		Floor_nr:      floor_nr,
+		Direction:     elevio.MD_Stop,
+		LastDirection: elevio.MD_Up,
+		On_floor:      true,
+		Door_open:     false,
+		Obstruction:   false,
 		Orders: [4][3]OrderType{
 			{{false, 100, time.Time{}}, {false, 555, time.Time{}}, {false, id, time.Time{}}},
 			{{false, 100, time.Time{}}, {false, 100, time.Time{}}, {false, id, time.Time{}}},
@@ -107,7 +108,7 @@ func (e *Elevator) StartMoving() {
 
 func (e *Elevator) OpenDoor() {
 	e.LastActive = time.Now()
-	e.LastDirection = e.Direction
+	//e.LastDirection = e.Direction
 	e.Behavior = EB_DoorOpen // Set state to door open
 	elevio.SetDoorOpenLamp(true)
 	e.ClearAtCurrentFloor()
@@ -131,6 +132,9 @@ func (e *Elevator) CloseDoorAndResume() {
 	//e.ClearAtCurrentFloor()   //this could be wrong
 	e.Direction, e.Behavior = e.ChooseDirection()
 	elevio.SetMotorDirection(e.Direction)
+	if e.Behavior == EB_DoorOpen {
+		e.OpenDoor()
+	}
 	fmt.Println("Resuming movement in direction:\n", e.Direction)
 	fmt.Println("Resuming movement with behavior:\n", e.Behavior)
 
