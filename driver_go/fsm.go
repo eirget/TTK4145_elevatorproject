@@ -56,7 +56,7 @@ func fsmHandleRequestButtonPress(a elevio.ButtonEvent, e *elevator.Elevator, ele
 	*new_order_flag = true
 	elevStateTx <- *e
 
-	fmt.Println("orders after button press: ", e.Orders)
+	//fmt.Println("orders after button press: ", e.Orders)
 
 	if a.Button == elevio.BT_Cab {
 		elevio.SetButtonLamp(a.Button, a.Floor, true)
@@ -68,11 +68,6 @@ func fsmHandleIdleState(e *elevator.Elevator, elevStateTx chan elevator.Elevator
 	if e.Behavior == elevator.EB_Idle {
 		//this will probably never be added again
 		/*
-				if e.JustStopped {
-					e.JustStopped = false
-					return
-				}
-
 			if e.ShouldStop() {
 				fmt.Println("Reopening at same floor to serve additional order")
 				e.StopAtFloor()
@@ -81,11 +76,6 @@ func fsmHandleIdleState(e *elevator.Elevator, elevStateTx chan elevator.Elevator
 			}
 		*/
 		e.HandleIdleState()
-		/*
-			if e.Direction != elevio.MD_Stop {
-				e.LastDirection = e.Direction
-			}
-		*/
 		if e.Behavior == elevator.EB_DoorOpen {
 			doorTimer.Reset(3 * time.Second)
 		}
@@ -100,7 +90,6 @@ func fsmHandleNewFloor(a int, e *elevator.Elevator, elevStateTx chan elevator.El
 	//ShouldStop returns true if it has pending orders in its current direction, or if you just in general have no reason to continue in your current direction
 	if e.ShouldStop() {
 		e.StopAtFloor()
-		//after StopAtFloor we have MD_Stop and EB_DoorOpen
 		doorTimer.Reset(3 * time.Second)
 	}
 
@@ -108,18 +97,16 @@ func fsmHandleNewFloor(a int, e *elevator.Elevator, elevStateTx chan elevator.El
 }
 
 func fsmHandleDoorTimeout(e *elevator.Elevator, doorTimer *time.Timer, elevStateTx chan elevator.Elevator) {
-	//i think here we have MD_Stop and EB_DoorOpen
 	if e.ShouldReopenForOppositeHallCall() {
 		fmt.Printf("Yes, should reopen for opposite hall call")
 
-		/* this should not be neccessary anymore but idk
 		if e.LastDirection == elevio.MD_Up {
 			e.LastDirection = elevio.MD_Down
-		} else if e.LastDirection == elevio.MD_Down {
+		} else if e.LastDirection == elevio.MD_Down{
 			e.LastDirection = elevio.MD_Up
 		}
-		*/
-		//e.Direction = e.LastDirection //maybe we should still have this
+
+		e.Direction = e.LastDirection
 		e.StopAtFloor()
 		doorTimer.Reset(3 * time.Second)
 		return
@@ -130,8 +117,8 @@ func fsmHandleDoorTimeout(e *elevator.Elevator, doorTimer *time.Timer, elevState
 		return
 	}
 	fmt.Println("Close door and resume called")
+	//what is e.Direction here? we think it is stop. if the e.ShouldReopenForOppositeHallCall() never happened
 	e.CloseDoorAndResume()
-	//after close door and resume we have whatever choose direction says, maybe it should just return idle so that handleIdleState fixes it?
 	elevStateTx <- *e
 }
 
