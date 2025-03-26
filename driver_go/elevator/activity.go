@@ -6,7 +6,7 @@ import (
 )
 
 // where should this go???
-func (e *Elevator) MonitorActivity(runHra chan<- bool) {
+func MonitorActivity(e *Elevator, runHra chan<- bool) {
 	ticker := time.NewTicker(1 * time.Second) // Check every second
 	defer ticker.Stop()
 	fmt.Printf("Last active: %v \n: ", e.LastActive)
