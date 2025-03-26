@@ -107,6 +107,7 @@ func (e *Elevator) StartMoving() {
 
 func (e *Elevator) OpenDoor() {
 	e.LastActive = time.Now()
+	e.LastDirection = e.Direction
 	e.Behavior = EB_DoorOpen // Set state to door open
 	elevio.SetDoorOpenLamp(true)
 	e.ClearAtCurrentFloor()
@@ -129,8 +130,10 @@ func (e *Elevator) CloseDoorAndResume() {
 	elevio.SetDoorOpenLamp(false)
 	e.Direction, e.Behavior = e.ChooseDirection()
 	elevio.SetMotorDirection(e.Direction)
-	fmt.Println("Resuming movement in direction:", e.Direction)
+	fmt.Println("Resuming movement in direction:\n", e.Direction)
+	fmt.Println("Resuming movement with behavior:\n", e.Behavior)
 }
+
 
 func (e *Elevator) SetLights() {
 	for floor := 0; floor < config.NumFloors; floor++ {
@@ -160,12 +163,12 @@ func (e *Elevator) ShouldReopenForOppositeHallCall() bool {
 	switch e.LastDirection {
 	case elevio.MD_Up:
 		return e.Orders[e.Floor_nr][BT_HallDown].State &&
-			!e.requestsAbove() &&
-			e.requestsBelow()
+			!e.requestsAbove() 
+			//e.requestsBelow()
 	case elevio.MD_Down:
 		return e.Orders[e.Floor_nr][BT_HallUp].State &&
-			!e.requestsBelow() &&
-			e.requestsAbove()
+			!e.requestsBelow() 
+			//e.requestsAbove()
 	default:
 		return false
 	}

@@ -103,6 +103,14 @@ func fsmHandleNewFloor(a int, e *elevator.Elevator, elevStateTx chan elevator.El
 
 func fsmHandleDoorTimeout(e *elevator.Elevator, doorTimer *time.Timer, elevStateTx chan elevator.Elevator) {
 	if e.ShouldReopenForOppositeHallCall() {
+		fmt.Printf("Yes, should reopen for opposite hall call")
+
+		if e.LastDirection == elevio.MD_Up {
+			e.LastDirection = elevio.MD_Down
+		} else if e.LastDirection == elevio.MD_Down{
+			e.LastDirection = elevio.MD_Up
+		}
+		e.Direction = e.LastDirection
 		e.StopAtFloor()
 		doorTimer.Reset(3 * time.Second)
 		return
