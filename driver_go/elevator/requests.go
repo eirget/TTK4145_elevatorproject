@@ -4,7 +4,6 @@ import (
 	"Driver_go/config"
 	"Driver_go/elevio"
 	"time"
-	"fmt"
 )
 
 func (e *Elevator) requestsAbove() bool {
@@ -45,48 +44,46 @@ func (e *Elevator) ChooseDirection() (elevio.MotorDirection, ElevatorBehavior) {
 	switch e.Direction {
 	case elevio.MD_Up:
 		if e.requestsAbove() {
+			e.LastDirection = elevio.MD_Up
 			return elevio.MD_Up, EB_Moving
 		}
 		if e.RequestsHere() {
-			return elevio.MD_Down, EB_DoorOpen
+			// About to switch to down, but need to stop first
+			e.LastDirection = elevio.MD_Up
+			return elevio.MD_Stop, EB_DoorOpen
 		}
 		if e.requestsBelow() {
+			e.LastDirection = elevio.MD_Down
 			return elevio.MD_Down, EB_Moving
 		}
-		return elevio.MD_Stop, EB_Idle
 	case elevio.MD_Down:
 		if e.requestsBelow() {
+			e.LastDirection = elevio.MD_Down
 			return elevio.MD_Down, EB_Moving
 		}
 		if e.RequestsHere() {
-			return elevio.MD_Up, EB_DoorOpen
-		}
-		if e.requestsAbove() {
-			return elevio.MD_Up, EB_Moving
-		}
-		return elevio.MD_Stop, EB_Idle
-	case elevio.MD_Stop:
-		if e.RequestsHere() {
-			//return elevio.MD_Stop, EB_Idle //did say DoorOpen
-			if e.Orders[e.Floor_nr][BT_HallUp].State && !e.requestsAbove() {
-				e.LastDirection = elevio.MD_Up
-			} else if e.Orders[e.Floor_nr][BT_HallDown].State && !e.requestsBelow() {
-				e.LastDirection = elevio.MD_Down
-			} else {
-				e.LastDirection = elevio.MD_Up
-			}
+			e.LastDirection = elevio.MD_Down
 			return elevio.MD_Stop, EB_DoorOpen
 		}
 		if e.requestsAbove() {
+			e.LastDirection = elevio.MD_Up
+			return elevio.MD_Up, EB_Moving
+		}
+	case elevio.MD_Stop:
+		if e.RequestsHere() {
+			// We don't update LastDirection here — not moving
+			return elevio.MD_Stop, EB_DoorOpen
+		}
+		if e.requestsAbove() {
+			e.LastDirection = elevio.MD_Up
 			return elevio.MD_Up, EB_Moving
 		}
 		if e.requestsBelow() {
+			e.LastDirection = elevio.MD_Down
 			return elevio.MD_Down, EB_Moving
 		}
-		return elevio.MD_Stop, EB_Idle
-	default:
-		return elevio.MD_Stop, EB_Idle
 	}
+	return elevio.MD_Stop, EB_Idle
 }
 
 // shouldStop checks if the elevator should stop at the current floor.
@@ -95,11 +92,11 @@ func (e *Elevator) ShouldStop() bool {
 	case elevio.MD_Down:
 		return (e.Orders[e.Floor_nr][BT_HallDown].State && e.Orders[e.Floor_nr][BT_HallDown].ElevatorID == e.ID) ||
 			(e.Orders[e.Floor_nr][BT_Cab].State && e.Orders[e.Floor_nr][BT_Cab].ElevatorID == e.ID) ||
-			(!e.requestsBelow() && !e.requestsAbove())
+			!e.requestsBelow()
 	case elevio.MD_Up:
 		return (e.Orders[e.Floor_nr][BT_HallUp].State && e.Orders[e.Floor_nr][BT_HallUp].ElevatorID == e.ID) ||
 			(e.Orders[e.Floor_nr][BT_Cab].State && e.Orders[e.Floor_nr][BT_Cab].ElevatorID == e.ID) ||
-			(!e.requestsBelow() && !e.requestsAbove())
+			!e.requestsAbove()
 	case elevio.MD_Stop:
 		return e.RequestsHere()
 	default:
@@ -107,8 +104,48 @@ func (e *Elevator) ShouldStop() bool {
 	}
 }
 
-// UPDATED
+func (e *Elevator) ClearAtCurrentFloor() {
+	switch e.Config.ClearRequestVariant {
+	case CV_InDirn:
+		// Always clear cab call
+		e.Orders[e.Floor_nr][BT_Cab].State = false
+		e.Orders[e.Floor_nr][BT_Cab].Timestamp = time.Now()
+
+		switch e.Direction {
+		case elevio.MD_Up:
+			if e.Orders[e.Floor_nr][BT_HallUp].State {
+				e.Orders[e.Floor_nr][BT_HallUp].State = false
+				e.Orders[e.Floor_nr][BT_HallUp].Timestamp = time.Now()
+				e.Orders[e.Floor_nr][BT_HallUp].ElevatorID = 100
+			}
+		case elevio.MD_Down:
+			if e.Orders[e.Floor_nr][BT_HallDown].State {
+				e.Orders[e.Floor_nr][BT_HallDown].State = false
+				e.Orders[e.Floor_nr][BT_HallDown].Timestamp = time.Now()
+				e.Orders[e.Floor_nr][BT_HallDown].ElevatorID = 100
+			}
+		case elevio.MD_Stop:
+			// Reuse LastDirection to figure out what just happened
+			switch e.LastDirection {
+			case elevio.MD_Up:
+				if e.Orders[e.Floor_nr][BT_HallDown].State {
+					e.Orders[e.Floor_nr][BT_HallDown].State = false
+					e.Orders[e.Floor_nr][BT_HallDown].Timestamp = time.Now()
+					e.Orders[e.Floor_nr][BT_HallDown].ElevatorID = 100
+				}
+			case elevio.MD_Down:
+				if e.Orders[e.Floor_nr][BT_HallUp].State {
+					e.Orders[e.Floor_nr][BT_HallUp].State = false
+					e.Orders[e.Floor_nr][BT_HallUp].Timestamp = time.Now()
+					e.Orders[e.Floor_nr][BT_HallUp].ElevatorID = 100
+				}
+			}
+		}
+	}
+}
+
 // clearAtCurrentFloor clears requests at the current floor.
+/*
 func (e *Elevator) ClearAtCurrentFloor() {
 	fmt.Printf("Clearing Orders at floor %v with LastDirection: %v\n", e.Floor_nr, e.LastDirection)
 	switch e.Config.ClearRequestVariant {
@@ -142,7 +179,7 @@ func (e *Elevator) ClearAtCurrentFloor() {
 		}
 	}
 }
-
+*/
 func AssignAllHallCallsToSelf(e *Elevator) {
 	for floor := 0; floor < config.NumFloors; floor++ {
 		for btn := 0; btn <= 1; btn++ { // HallUp and HallDown only

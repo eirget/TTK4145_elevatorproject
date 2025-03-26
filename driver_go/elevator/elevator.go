@@ -134,7 +134,6 @@ func (e *Elevator) CloseDoorAndResume() {
 	fmt.Println("Resuming movement with behavior:\n", e.Behavior)
 }
 
-
 func (e *Elevator) SetLights() {
 	for floor := 0; floor < config.NumFloors; floor++ {
 		hallUp := e.Orders[floor][BT_HallUp].State
@@ -162,13 +161,9 @@ func (e *Elevator) HasPendingOrders() bool {
 func (e *Elevator) ShouldReopenForOppositeHallCall() bool {
 	switch e.LastDirection {
 	case elevio.MD_Up:
-		return e.Orders[e.Floor_nr][BT_HallDown].State &&
-			!e.requestsAbove() 
-			//e.requestsBelow()
+		return e.Orders[e.Floor_nr][BT_HallDown].State && !e.requestsAbove()
 	case elevio.MD_Down:
-		return e.Orders[e.Floor_nr][BT_HallUp].State &&
-			!e.requestsBelow() 
-			//e.requestsAbove()
+		return e.Orders[e.Floor_nr][BT_HallUp].State && !e.requestsBelow()
 	default:
 		return false
 	}
