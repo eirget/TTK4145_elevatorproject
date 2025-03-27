@@ -6,7 +6,8 @@ import (
 	"Driver_go/network/peers"
 )
 
-func NetworkInit(id string,
+func NetworkInit(
+	id string,
 	peerUpdateCh chan peers.PeerUpdate,
 	peerTxEnable chan bool,
 	elevStateTx chan elevator.Elevator,

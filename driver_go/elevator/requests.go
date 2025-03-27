@@ -40,69 +40,69 @@ func (e *Elevator) RequestsHere() bool {
 // chooseDirection decides the next direction based on Orders
 func (e *Elevator) ChooseDirection() (elevio.MotorDirection, ElevatorBehavior) {
 	switch e.Direction {
-	case elevio.MD_Up:
+	case elevio.MDUp:
 		if e.requestsAbove() {
-			return elevio.MD_Up, EB_Moving
+			return elevio.MDUp, EBMoving
 		}
 		if e.RequestsHere() {
-			return elevio.MD_Down, EB_DoorOpen
+			return elevio.MDDown, EBDoorOpen
 		}
 		if e.requestsBelow() {
-			return elevio.MD_Down, EB_Moving
+			return elevio.MDDown, EBMoving
 		}
-		return elevio.MD_Stop, EB_Idle
-	case elevio.MD_Down:
+		return elevio.MDStop, EBIdle
+	case elevio.MDDown:
 		if e.requestsBelow() {
-			return elevio.MD_Down, EB_Moving
+			return elevio.MDDown, EBMoving
 		}
 		if e.RequestsHere() {
-			return elevio.MD_Up, EB_DoorOpen
+			return elevio.MDUp, EBDoorOpen
 		}
 		if e.requestsAbove() {
-			return elevio.MD_Up, EB_Moving
+			return elevio.MDUp, EBMoving
 		}
-		return elevio.MD_Stop, EB_Idle
-	case elevio.MD_Stop:
+		return elevio.MDStop, EBIdle
+	case elevio.MDStop:
 		switch e.LastDirection {
-		case elevio.MD_Up:
+		case elevio.MDUp:
 			if e.requestsAbove() {
-				return elevio.MD_Up, EB_Moving
+				return elevio.MDUp, EBMoving
 			}
 			if e.requestsBelow() {
-				return elevio.MD_Down, EB_Moving
+				return elevio.MDDown, EBMoving
 			}
 			if e.RequestsHere() {
-				return elevio.MD_Stop, EB_DoorOpen
+				return elevio.MDStop, EBDoorOpen
 			}
-		case elevio.MD_Down:
+		case elevio.MDDown:
 			if e.requestsBelow() {
-				return elevio.MD_Down, EB_Moving
+				return elevio.MDDown, EBMoving
 			}
 			if e.requestsAbove() {
-				return elevio.MD_Up, EB_Moving
+				return elevio.MDUp, EBMoving
 			}
 			if e.RequestsHere() {
-				return elevio.MD_Stop, EB_DoorOpen
+				return elevio.MDStop, EBDoorOpen
 			}
 		}
 
-		return elevio.MD_Stop, EB_Idle
+		return elevio.MDStop, EBIdle
 	default:
-		return elevio.MD_Stop, EB_Idle
+		return elevio.MDStop, EBIdle
 	}
 }
 
 func (e *Elevator) ShouldStop() bool {
 	switch e.Direction {
-	case elevio.MD_Down:
-		return (e.Orders[e.FloorNr][BT_HallDown].State && e.Orders[e.FloorNr][BT_HallDown].ElevatorID == e.ID) ||
-			(e.Orders[e.FloorNr][BT_Cab].State && e.Orders[e.FloorNr][BT_Cab].ElevatorID == e.ID) ||
+	case elevio.MDDown:
+		return (e.Orders[e.FloorNr][BTHallDown].State && e.Orders[e.FloorNr][BTHallDown].ElevatorID == e.ID) ||
+			(e.Orders[e.FloorNr][BTCab].State && e.Orders[e.FloorNr][BTCab].ElevatorID == e.ID) ||
 			!e.requestsBelow()
-	case elevio.MD_Up:
-		return (e.Orders[e.FloorNr][BT_HallUp].State && e.Orders[e.FloorNr][BT_HallUp].ElevatorID == e.ID) ||
-			(e.Orders[e.FloorNr][BT_Cab].State && e.Orders[e.FloorNr][BT_Cab].ElevatorID == e.ID) ||
+	case elevio.MDUp:
+		return (e.Orders[e.FloorNr][BTHallUp].State && e.Orders[e.FloorNr][BTHallUp].ElevatorID == e.ID) ||
+			(e.Orders[e.FloorNr][BTCab].State && e.Orders[e.FloorNr][BTCab].ElevatorID == e.ID) ||
 			!e.requestsAbove()
-	case elevio.MD_Stop:
+	case elevio.MDStop:
 		return e.RequestsHere()
 	default:
 		return false
@@ -110,39 +110,39 @@ func (e *Elevator) ShouldStop() bool {
 }
 
 func (e *Elevator) ClearAtCurrentFloor() {
-	if e.Orders[e.FloorNr][BT_Cab].ElevatorID == e.ID {
-		e.Orders[e.FloorNr][BT_Cab].State = false
-		e.Orders[e.FloorNr][BT_Cab].Timestamp = time.Now()
+	if e.Orders[e.FloorNr][BTCab].ElevatorID == e.ID {
+		e.Orders[e.FloorNr][BTCab].State = false
+		e.Orders[e.FloorNr][BTCab].Timestamp = time.Now()
 	}
 	switch e.Direction {
-	case elevio.MD_Up:
-		if e.Orders[e.FloorNr][BT_HallUp].ElevatorID == e.ID {
-			e.clearHallCall(BT_HallUp)
+	case elevio.MDUp:
+		if e.Orders[e.FloorNr][BTHallUp].ElevatorID == e.ID {
+			e.clearHallCall(BTHallUp)
 		}
-		if !e.requestsAbove() && e.Orders[e.FloorNr][BT_HallDown].ElevatorID == e.ID {
-			e.clearHallCall(BT_HallDown)
+		if !e.requestsAbove() && e.Orders[e.FloorNr][BTHallDown].ElevatorID == e.ID {
+			e.clearHallCall(BTHallDown)
 		}
-	case elevio.MD_Down:
-		if e.Orders[e.FloorNr][BT_HallDown].ElevatorID == e.ID {
-			e.clearHallCall(BT_HallDown)
+	case elevio.MDDown:
+		if e.Orders[e.FloorNr][BTHallDown].ElevatorID == e.ID {
+			e.clearHallCall(BTHallDown)
 		}
-		if !e.requestsBelow() && e.Orders[e.FloorNr][BT_HallUp].ElevatorID == e.ID {
-			e.clearHallCall(BT_HallUp)
+		if !e.requestsBelow() && e.Orders[e.FloorNr][BTHallUp].ElevatorID == e.ID {
+			e.clearHallCall(BTHallUp)
 		}
-	case elevio.MD_Stop:
+	case elevio.MDStop:
 		// Clear hall call in the direction we came from
 		switch e.LastDirection {
-		case elevio.MD_Up:
-			if e.Orders[e.FloorNr][elevio.BT_HallUp].State && e.Orders[e.FloorNr][BT_HallUp].ElevatorID == e.ID && (e.FloorNr != config.NumFloors) {
-				e.clearHallCall(BT_HallUp)
-			} else if e.Orders[e.FloorNr][BT_HallDown].ElevatorID == e.ID {
-				e.clearHallCall(BT_HallDown)
+		case elevio.MDUp:
+			if e.Orders[e.FloorNr][elevio.BTHallUp].State && e.Orders[e.FloorNr][BTHallUp].ElevatorID == e.ID && (e.FloorNr != config.NumFloors) {
+				e.clearHallCall(BTHallUp)
+			} else if e.Orders[e.FloorNr][BTHallDown].ElevatorID == e.ID {
+				e.clearHallCall(BTHallDown)
 			}
-		case elevio.MD_Down:
-			if e.Orders[e.FloorNr][elevio.BT_HallDown].State && e.Orders[e.FloorNr][BT_HallDown].ElevatorID == e.ID && (e.FloorNr != 0) {
-				e.clearHallCall(BT_HallDown)
-			} else if e.Orders[e.FloorNr][BT_HallUp].ElevatorID == e.ID {
-				e.clearHallCall(BT_HallUp)
+		case elevio.MDDown:
+			if e.Orders[e.FloorNr][elevio.BTHallDown].State && e.Orders[e.FloorNr][BTHallDown].ElevatorID == e.ID && (e.FloorNr != 0) {
+				e.clearHallCall(BTHallDown)
+			} else if e.Orders[e.FloorNr][BTHallUp].ElevatorID == e.ID {
+				e.clearHallCall(BTHallUp)
 			}
 		}
 	}

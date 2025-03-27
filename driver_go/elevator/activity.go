@@ -18,6 +18,8 @@ func MonitorActivity(e *Elevator, runHraCh chan<- struct{}) {
 				default:
 
 				}
+			} else {
+				e.LastActive = time.Now()
 			}
 		}
 	}

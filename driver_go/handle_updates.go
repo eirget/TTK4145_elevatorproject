@@ -12,16 +12,28 @@ import (
 )
 
 // update elevator to have newest state of other elevators
-func handleElevatorUpdates(localElevator *elevator.Elevator, elevStateRx <-chan elevator.Elevator, elevatorMap map[string]*elevator.Elevator, runHraCh chan struct{}, newOrderCh chan struct{}) {
+func handleElevatorUpdates(
+	elev *elevator.Elevator,
+	elevStateRx <-chan elevator.Elevator,
+	elevatorMap map[string]*elevator.Elevator,
+	runHraCh chan struct{},
+	newOrderCh chan struct{}) {
+
 	for elevRx := range elevStateRx {
 
 		elevatorMapLock.Lock()
-		copy := elevRx
+		elevRxCopy := elevRx
 		idStr := strconv.Itoa(elevRx.ID)
-		elevatorMap[idStr] = &copy
+		elevatorMap[idStr] = &elevRxCopy
 
-		if elevRx.ID == localElevator.ID {
-			localElevator.Orders = elevRx.Orders
+		if elevRx.ID == elev.ID {
+			for floor := 0; floor < config.NumFloors; floor++ {
+				for btn := 0; btn < config.NumButtons; btn++ {
+					if elevRx.Orders[floor][btn].Timestamp.After(elev.Orders[floor][btn].Timestamp) {
+						elev.Orders[floor][btn] = elevRx.Orders[floor][btn]
+					}
+				}
+			}
 		}
 
 		elevatorMapLock.Unlock()
@@ -29,13 +41,13 @@ func handleElevatorUpdates(localElevator *elevator.Elevator, elevStateRx <-chan 
 		for floor := 0; floor < config.NumFloors; floor++ {
 			for btn := 0; btn < config.NumHallButtons; btn++ {
 				// Compare timestamps to ensure only newer updates are accepted
-				if elevRx.Orders[floor][btn].Timestamp.After(localElevator.Orders[floor][btn].Timestamp) {
-					localElevator.Orders[floor][btn] = elevRx.Orders[floor][btn]
+				if elevRx.Orders[floor][btn].Timestamp.After(elev.Orders[floor][btn].Timestamp) {
+					elev.Orders[floor][btn] = elevRx.Orders[floor][btn]
 				}
 			}
 		}
 
-		localElevator.SetLights()
+		elev.SetLights()
 
 		select {
 		case <-newOrderCh:
@@ -59,6 +71,7 @@ func handlePeerUpdates(
 	elevatorMapLock *sync.Mutex,
 	runHraCh chan struct{},
 	elevatorMap map[string]*elevator.Elevator) {
+
 	for peerUpdate := range peerUpdateCh {
 		fmt.Printf("Peer update:\n")
 		fmt.Printf("  Peers:    %q\n", peerUpdate.Peers)
@@ -136,8 +149,8 @@ func handleRunHraRequest(
 			}
 
 			if time.Since(elev.LastActive) < 5*time.Second {
-				copy := *elev
-				activeElevators[id] = &copy
+				elevCopy := *elev
+				activeElevators[id] = &elevCopy
 			}
 
 		}

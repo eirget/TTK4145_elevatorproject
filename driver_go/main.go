@@ -27,7 +27,7 @@ func main() {
 	if err != nil {
 		fmt.Printf("Invalid port number %v \n", err)
 	}
-	id := (portNum - 20000)
+	id := (portNum - 10000)
 	idStr := strconv.Itoa(id)
 
 	var latestLost []string
@@ -42,12 +42,12 @@ func main() {
 	addr := "localhost:" + port
 	elevio.Init(addr, config.NumFloors)
 
-	drv_buttons := make(chan elevio.ButtonEvent)
-	drv_floors := make(chan int)
-	drv_obstr := make(chan bool)
-	drv_stop := make(chan bool)
+	drvButtons := make(chan elevio.ButtonEvent)
+	drvFloors := make(chan int)
+	drvObstr := make(chan bool)
+	drvStop := make(chan bool)
 
-	elevio.ElevioInit(drv_buttons, drv_floors, drv_obstr, drv_stop)
+	elevio.ElevioInit(drvButtons, drvFloors, drvObstr, drvStop)
 
 	//channels for receiving and transmitting updates on the id's of the peers that are alive on the network
 	peerUpdateCh := make(chan peers.PeerUpdate)
@@ -65,10 +65,10 @@ func main() {
 
 	network.NetworkInit(idStr, peerUpdateCh, peerTxEnable, elevStateTx, elevStateRx, runHraCh, receiveRunHraCh)
 
-	eAtFloor := elevator.WaitForValidFloor(elevio.MD_Up, drv_floors)
-	fmt.Println("Elevator initalized at floor: ", eAtFloor)
+	elevAtFloor := elevator.WaitForValidFloor(elevio.MDUp, drvFloors)
+	fmt.Println("Elevator initalized at floor: ", elevAtFloor)
 
-	localElevator := elevator.ElevatorInit(eAtFloor, id)
+	localElevator := elevator.ElevatorInit(elevAtFloor, id)
 
 	elevStateTx <- *localElevator
 
@@ -76,7 +76,7 @@ func main() {
 
 	fmt.Printf("Started elevator system \n")
 
-	go fsm(localElevator, elevStateTx, drv_buttons, drv_floors, drv_obstr, drv_stop, config.NumFloors, newOrderCh)
+	go fsm(localElevator, elevStateTx, drvButtons, drvFloors, drvObstr, drvStop, newOrderCh)
 
 	go elevator.MonitorActivity(localElevator, runHraCh) //SHOULD WE TRY TO MAKE THIS A METHOD?
 

@@ -25,7 +25,8 @@ type HRAInput struct {
 	States       map[string]HRAElevState `json:"states"`
 }
 
-func hallRequestAssigner(elev *elevator.Elevator,
+func hallRequestAssigner(
+	elev *elevator.Elevator,
 	activeElevators map[string]*elevator.Elevator,
 	id string,
 	hraExecutable string,
@@ -54,7 +55,9 @@ func hallRequestAssigner(elev *elevator.Elevator,
 	elevStateTx <- *elev
 }
 
-func buildHRAInput(elev *elevator.Elevator, activeElevators map[string]*elevator.Elevator) HRAInput {
+func buildHRAInput(
+	elev *elevator.Elevator,
+	activeElevators map[string]*elevator.Elevator) HRAInput {
 
 	hallRequestLock.Lock()
 	defer hallRequestLock.Unlock()
@@ -71,15 +74,15 @@ func buildHRAInput(elev *elevator.Elevator, activeElevators map[string]*elevator
 		States:       make(map[string]HRAElevState),
 	}
 
-	for peerID, e := range activeElevators {
+	for peerID, activeElev := range activeElevators {
 		individualCabRequests := make([]bool, config.NumFloors)
-		for f := 0; f < config.NumFloors; f++ {
-			individualCabRequests[f] = e.Orders[f][2].State
+		for floor := 0; floor < config.NumFloors; floor++ {
+			individualCabRequests[floor] = activeElev.Orders[floor][2].State
 		}
 		input.States[peerID] = HRAElevState{
-			Behavior:    elevator.BehaviorMap[e.Behavior],
-			Floor:       e.FloorNr,
-			Direction:   elevator.DirectionMap[e.Direction],
+			Behavior:    elevator.BehaviorMap[activeElev.Behavior],
+			Floor:       activeElev.FloorNr,
+			Direction:   elevator.DirectionMap[activeElev.Direction],
 			CabRequests: individualCabRequests,
 		}
 	}
@@ -87,13 +90,14 @@ func buildHRAInput(elev *elevator.Elevator, activeElevators map[string]*elevator
 }
 
 func runHraProcess(input HRAInput, hraExecutable string) (map[string][][2]bool, error) {
+
 	jsonBytes, err := json.Marshal(input)
 	if err != nil {
 		fmt.Println("json.Marshal error: ", err)
 		return nil, err
 	}
 
-	ret, err := exec.Command("../"+hraExecutable, "-i", string(jsonBytes)).CombinedOutput()
+	ret, err := exec.Command("hall_request_assigner/"+hraExecutable, "-i", string(jsonBytes)).CombinedOutput()
 	if err != nil {
 		fmt.Println("exec.Command error: ", err)
 		fmt.Println(string(ret))
@@ -109,16 +113,21 @@ func runHraProcess(input HRAInput, hraExecutable string) (map[string][][2]bool, 
 	return output, nil
 }
 
-func updateHallOrders(peerID string, elev *elevator.Elevator, newRequests [][2]bool, assignedID int, activeElevators map[string]*elevator.Elevator, localID string) {
-	e, exists := activeElevators[peerID]
-	if !exists || e == nil {
+func updateHallOrders(
+	peerID string, elev *elevator.Elevator,
+	newRequests [][2]bool, assignedID int,
+	activeElevators map[string]*elevator.Elevator,
+	localID string) {
+
+	activeElev, exists := activeElevators[peerID]
+	if !exists || activeElev == nil {
 		fmt.Printf("Warning: No active elevator with ID %s\n", peerID)
 		return
 	}
 	now := time.Now()
 	for floor := 0; floor < config.NumFloors; floor++ {
 		for btn := 0; btn <= 1; btn++ {
-			current := &e.Orders[floor][btn]
+			current := &activeElev.Orders[floor][btn]
 
 			if newRequests[floor][btn] {
 				//update only if this is a new assignment or state was false
@@ -136,8 +145,8 @@ func updateHallOrders(peerID string, elev *elevator.Elevator, newRequests [][2]b
 	if peerID == localID {
 		//reflect updated orders in this local elevator's view
 		for f := 0; f < config.NumFloors; f++ {
-			elev.Orders[f][0] = e.Orders[f][0]
-			elev.Orders[f][1] = e.Orders[f][1]
+			elev.Orders[f][0] = activeElev.Orders[f][0]
+			elev.Orders[f][1] = activeElev.Orders[f][1]
 		}
 	}
 }

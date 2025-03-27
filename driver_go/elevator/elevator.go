@@ -16,15 +16,15 @@ type OrderType struct {
 type ElevatorBehavior int
 
 const (
-	EB_Idle ElevatorBehavior = iota
-	EB_DoorOpen
-	EB_Moving
+	EBIdle ElevatorBehavior = iota
+	EBDoorOpen
+	EBMoving
 )
 
 const (
-	BT_HallUp   = 0
-	BT_HallDown = 1
-	BT_Cab      = 2
+	BTHallUp   = 0
+	BTHallDown = 1
+	BTCab      = 2
 )
 
 type Elevator struct {
@@ -41,15 +41,15 @@ type Elevator struct {
 }
 
 var DirectionMap = map[elevio.MotorDirection]string{
-	elevio.MD_Up:   "up",
-	elevio.MD_Down: "down",
-	elevio.MD_Stop: "stop",
+	elevio.MDUp:   "up",
+	elevio.MDDown: "down",
+	elevio.MDStop: "stop",
 }
 
 var BehaviorMap = map[ElevatorBehavior]string{
-	EB_Idle:     "idle",
-	EB_DoorOpen: "doorOpen",
-	EB_Moving:   "moving",
+	EBIdle:     "idle",
+	EBDoorOpen: "doorOpen",
+	EBMoving:   "moving",
 }
 
 type Config struct {
@@ -67,8 +67,8 @@ func ElevatorInit(floorNr int, id int) *Elevator {
 	return &Elevator{
 		ID:            id,
 		FloorNr:       floorNr,
-		Direction:     elevio.MD_Stop,
-		LastDirection: elevio.MD_Up,
+		Direction:     elevio.MDStop,
+		LastDirection: elevio.MDUp,
 		OnFloor:       true,
 		DoorOpen:      false,
 		Obstruction:   false,
@@ -78,13 +78,21 @@ func ElevatorInit(floorNr int, id int) *Elevator {
 			{{false, 100, time.Time{}}, {false, 100, time.Time{}}, {false, id, time.Time{}}},
 			{{false, 555, time.Time{}}, {false, 100, time.Time{}}, {false, id, time.Time{}}},
 		},
-		Behavior:   EB_Idle,
+		Behavior:   EBIdle,
 		LastActive: time.Now(),
 	}
 }
 
+func initOrders() {
+	for floor := 0; floor < config.NumFloors; floor++ {
+		if floor == 0 {
+			OrderType
+		}
+	}
+}
+
 func WaitForValidFloor(d elevio.MotorDirection, drv_floors chan int) int {
-	floorChan := make(chan int)
+	floorCh := make(chan int)
 	go func() {
 		elevio.SetMotorDirection(d)
 		for {
@@ -92,8 +100,8 @@ func WaitForValidFloor(d elevio.MotorDirection, drv_floors chan int) int {
 			case floorSensor := <-drv_floors:
 				if floorSensor != -1 {
 					fmt.Println("Started at floor: ", floorSensor)
-					elevio.SetMotorDirection(elevio.MD_Stop)
-					floorChan <- floorSensor
+					elevio.SetMotorDirection(elevio.MDStop)
+					floorCh <- floorSensor
 					return
 				}
 			case <-time.After(500 * time.Millisecond):
@@ -102,65 +110,69 @@ func WaitForValidFloor(d elevio.MotorDirection, drv_floors chan int) int {
 		}
 	}()
 
-	return <-floorChan
+	return <-floorCh
 }
 
-func (e *Elevator) HandleIdleState() {
+func (e *Elevator) HandleIdleState(doorTimer *time.Timer) {
 	e.LastActive = time.Now()
 	e.Direction, e.Behavior = e.ChooseDirection()
 
 	switch e.Behavior {
-	case EB_Moving:
+	case EBMoving:
 		e.StartMoving()
-	case EB_DoorOpen:
-		e.OpenDoor()
+	case EBDoorOpen:
+		e.OpenDoor(doorTimer)
 	}
 }
 
 func (e *Elevator) StartMoving() {
 	e.LastActive = time.Now()
 	e.Direction = elevio.MotorDirection(e.Direction)
-	e.Behavior = EB_Moving
+	e.Behavior = EBMoving
 	elevio.SetMotorDirection(e.Direction)
 }
 
-func (e *Elevator) OpenDoor() {
+func (e *Elevator) OpenDoor(doorTimer *time.Timer) {
 	e.LastActive = time.Now()
-	e.Behavior = EB_DoorOpen
+	e.Behavior = EBDoorOpen
 	elevio.SetDoorOpenLamp(true)
 	e.ClearAtCurrentFloor()
+
+	if doorTimer != nil {
+		doorTimer.Reset(3 * time.Second)
+	}
 }
 
 func (e *Elevator) StopAtFloor() {
 	e.LastActive = time.Now()
 	e.LastDirection = e.Direction
-	e.Direction = elevio.MD_Stop
-	e.Behavior = EB_DoorOpen
+	e.Direction = elevio.MDStop
+	e.Behavior = EBDoorOpen
 	elevio.SetMotorDirection(e.Direction)
 	elevio.SetDoorOpenLamp(true)
 	e.ClearAtCurrentFloor()
 }
 
-func (e *Elevator) CloseDoorAndResume() {
+func (e *Elevator) CloseDoorAndResume(doorTimer *time.Timer) {
 	e.LastActive = time.Now()
-	e.Behavior = EB_Idle
+	e.Behavior = EBIdle
 	elevio.SetDoorOpenLamp(false)
 	e.Direction, e.Behavior = e.ChooseDirection()
 	elevio.SetMotorDirection(e.Direction)
-	if e.Behavior == EB_DoorOpen {
-		e.OpenDoor()
+	if e.Behavior == EBDoorOpen {
+		e.OpenDoor(doorTimer)
 	}
 }
 
 func (e *Elevator) SetLights() {
 	for floor := 0; floor < config.NumFloors; floor++ {
-		hallUp := e.Orders[floor][BT_HallUp].State
-		hallDown := e.Orders[floor][BT_HallDown].State
-		cab := e.Orders[floor][BT_Cab].State
+		hallUp := e.Orders[floor][BTHallUp].State
+		hallDown := e.Orders[floor][BTHallDown].State
+		cab := e.Orders[floor][BTCab].State
 
-		elevio.SetButtonLamp(BT_HallUp, floor, hallUp)
-		elevio.SetButtonLamp(BT_HallDown, floor, hallDown)
-		elevio.SetButtonLamp(BT_Cab, floor, cab)
+		elevio.SetButtonLamp(BTHallUp, floor, hallUp)
+		elevio.SetButtonLamp(BTHallDown, floor, hallDown)
+		elevio.SetButtonLamp(BTCab, floor, cab)
 	}
 }
 
@@ -177,11 +189,11 @@ func (e *Elevator) HasPendingHallOrders() bool {
 
 func (e *Elevator) ShouldReopenForOppositeHallCall() bool {
 	switch e.LastDirection {
-	case elevio.MD_Up:
-		return e.Orders[e.FloorNr][BT_HallDown].State &&
+	case elevio.MDUp:
+		return e.Orders[e.FloorNr][BTHallDown].State &&
 			!e.requestsAbove()
-	case elevio.MD_Down:
-		return e.Orders[e.FloorNr][BT_HallUp].State &&
+	case elevio.MDDown:
+		return e.Orders[e.FloorNr][BTHallUp].State &&
 			!e.requestsBelow()
 	default:
 		return false

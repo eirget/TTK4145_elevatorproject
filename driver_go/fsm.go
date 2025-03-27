@@ -1,19 +1,20 @@
 package main
 
 import (
+	"Driver_go/config"
 	"Driver_go/elevator"
 	"Driver_go/elevio"
 	"fmt"
 	"time"
 )
 
-func fsm(e *elevator.Elevator,
+func fsm(
+	elev *elevator.Elevator,
 	elevStateTx chan elevator.Elevator,
-	req_chan chan elevio.ButtonEvent,
-	new_floor_chan chan int,
-	obstr_chan chan bool,
-	stop_chan chan bool,
-	number_of_floors int,
+	reqCh chan elevio.ButtonEvent,
+	newFloorCh chan int,
+	obstrCh chan bool,
+	stopCh chan bool,
 	newOrderCh chan struct{}) {
 
 	doorTimer := time.NewTimer(0)
@@ -21,36 +22,39 @@ func fsm(e *elevator.Elevator,
 
 	for {
 		select {
-		case newReq := <-req_chan:
-			fsmHandleNewRequest(newReq, e, elevStateTx, newOrderCh)
+		case newReq := <-reqCh:
+			fsmHandleNewRequest(newReq, elev, elevStateTx, newOrderCh)
 
 		case <-time.After(100 * time.Millisecond):
-			fsmHandleIdleState(e, elevStateTx, doorTimer)
+			fsmHandleIdleState(elev, elevStateTx, doorTimer)
 
-		case newFloor := <-new_floor_chan:
-			fsmHandleNewFloor(newFloor, e, elevStateTx, doorTimer)
+		case newFloor := <-newFloorCh:
+			fsmHandleNewFloor(newFloor, elev, elevStateTx, doorTimer)
 
 		case <-doorTimer.C:
-			fsmHandleDoorTimeout(e, doorTimer, elevStateTx)
+			fsmHandleDoorTimeout(elev, doorTimer, elevStateTx)
 
-		case isObstructed := <-obstr_chan:
-			fmt.Println("Obstruction happened")
-			fsmHandleObstruction(isObstructed, e)
+		case isObstructed := <-obstrCh:
+			fsmHandleObstruction(isObstructed, elev)
 
-		case isStopped := <-stop_chan:
-			fsmHandleEmergencyStop(isStopped, e, number_of_floors)
+		case <-stopCh:
+			fsmHandleEmergencyStop(elev)
 		}
 	}
 }
 
-func fsmHandleNewRequest(newReq elevio.ButtonEvent, e *elevator.Elevator, elevStateTx chan elevator.Elevator, newOrderCh chan struct{}) {
-	fmt.Printf("%+v\n", newReq)
-	e.Orders[newReq.Floor][newReq.Button].State = true
-	e.Orders[newReq.Floor][newReq.Button].Timestamp = time.Now()
+func fsmHandleNewRequest(
+	newReq elevio.ButtonEvent,
+	elev *elevator.Elevator,
+	elevStateTx chan elevator.Elevator,
+	newOrderCh chan struct{}) {
 
-	elevStateTx <- *e
+	elev.Orders[newReq.Floor][newReq.Button].State = true
+	elev.Orders[newReq.Floor][newReq.Button].Timestamp = time.Now()
 
-	if newReq.Button == elevio.BT_Cab {
+	elevStateTx <- *elev
+
+	if newReq.Button == elevio.BTCab {
 		elevio.SetButtonLamp(newReq.Button, newReq.Floor, true)
 	}
 
@@ -60,69 +64,85 @@ func fsmHandleNewRequest(newReq elevio.ButtonEvent, e *elevator.Elevator, elevSt
 	}
 }
 
-func fsmHandleIdleState(e *elevator.Elevator, elevStateTx chan elevator.Elevator, doorTimer *time.Timer) {
-	if e.Behavior == elevator.EB_Idle {
-		e.HandleIdleState()
-		if e.Behavior == elevator.EB_DoorOpen {
-			doorTimer.Reset(3 * time.Second)
+func fsmHandleIdleState(
+	elev *elevator.Elevator,
+	elevStateTx chan elevator.Elevator,
+	doorTimer *time.Timer) {
+
+	if elev.Behavior == elevator.EBIdle {
+		elev.HandleIdleState(doorTimer)
+		if elev.Behavior == elevator.EBDoorOpen {
+			//doorTimer.Reset(3 * time.Second)
 		}
 	}
-	elevStateTx <- *e
+	elevStateTx <- *elev
 }
 
-func fsmHandleNewFloor(a int, e *elevator.Elevator, elevStateTx chan elevator.Elevator, doorTimer *time.Timer) {
-	e.FloorNr = a
-	elevio.SetFloorIndicator(a)
-	e.LastActive = time.Now()
+func fsmHandleNewFloor(
+	newFloor int,
+	elev *elevator.Elevator,
+	elevStateTx chan elevator.Elevator,
+	doorTimer *time.Timer) {
 
-	if e.ShouldStop() {
-		e.StopAtFloor()
+	elev.FloorNr = newFloor
+	elevio.SetFloorIndicator(elev.FloorNr)
+	elev.LastActive = time.Now()
+
+	if elev.ShouldStop() {
+		elev.StopAtFloor()
 		doorTimer.Reset(3 * time.Second)
 	}
-	elevStateTx <- *e
+	elevStateTx <- *elev
 }
 
-func fsmHandleDoorTimeout(e *elevator.Elevator, doorTimer *time.Timer, elevStateTx chan elevator.Elevator) {
-	if e.ShouldReopenForOppositeHallCall() {
-		fmt.Println("Should reopen for opposite hall call")
+func fsmHandleDoorTimeout(
+	elev *elevator.Elevator,
+	doorTimer *time.Timer,
+	elevStateTx chan elevator.Elevator) {
 
-		if e.LastDirection == elevio.MD_Up {
-			e.LastDirection = elevio.MD_Down
-		} else if e.LastDirection == elevio.MD_Down {
-			e.LastDirection = elevio.MD_Up
+	if elev.ShouldReopenForOppositeHallCall() {
+		fmt.Println("Should reopen for opposite hall call. Changing direction")
+
+		if elev.LastDirection == elevio.MDUp {
+			elev.LastDirection = elevio.MDDown
+		} else if elev.LastDirection == elevio.MDDown {
+			elev.LastDirection = elevio.MDUp
 		}
 
-		e.Direction = e.LastDirection
-		e.StopAtFloor()
+		elev.Direction = elev.LastDirection
+		elev.StopAtFloor()
 		doorTimer.Reset(3 * time.Second)
 		return
 	}
-	if e.Obstruction {
+
+	if elev.Obstruction {
 		fmt.Println("Waiting for obstruction to clear...")
 		doorTimer.Reset(500 * time.Millisecond)
 		return
 	}
-	e.CloseDoorAndResume()
-	elevStateTx <- *e
+
+	elev.CloseDoorAndResume(doorTimer)
+	elevStateTx <- *elev
 }
 
-func fsmHandleObstruction(isObstructed bool, e *elevator.Elevator) {
-	e.Obstruction = isObstructed
+func fsmHandleObstruction(isObstructed bool, elev *elevator.Elevator) {
+
+	elev.Obstruction = isObstructed
 
 	if isObstructed {
-		fmt.Println("Obstruction detected! Waiting for it to clear...")
+		fmt.Println("Obstruction detected!")
 	}
 }
 
-func fsmHandleEmergencyStop(a bool, e *elevator.Elevator, number_of_floors int) {
-	fmt.Printf("%+v\n", a)
-	elevio.SetStopLamp(true)
-	elevio.SetMotorDirection(elevio.MD_Stop)
-	e.Behavior = elevator.EB_Idle
-	e.Direction = elevio.MD_Stop
-	e.Orders = [4][3]elevator.OrderType{}
+func fsmHandleEmergencyStop(elev *elevator.Elevator) {
 
-	for floor := 0; floor < number_of_floors; floor++ {
+	elevio.SetStopLamp(true)
+	elevio.SetMotorDirection(elevio.MDStop)
+	elev.Behavior = elevator.EBIdle
+	elev.Direction = elevio.MDStop
+	elev.Orders = [4][3]elevator.OrderType{}
+
+	for floor := 0; floor < config.NumFloors; floor++ {
 		for btn := elevio.ButtonType(0); btn < 3; btn++ {
 			elevio.SetButtonLamp(btn, floor, false)
 		}
