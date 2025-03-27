@@ -37,7 +37,7 @@ func (e *Elevator) RequestsHere() bool {
 	return false
 }
 
-// chooseDirection decides the next direction based on Orders
+// decides the next direction based on Orders
 func (e *Elevator) ChooseDirection() (elevio.MotorDirection, ElevatorBehavior) {
 	switch e.Direction {
 	case elevio.MDUp:
@@ -63,6 +63,7 @@ func (e *Elevator) ChooseDirection() (elevio.MotorDirection, ElevatorBehavior) {
 		}
 		return elevio.MDStop, EBIdle
 	case elevio.MDStop:
+		// use LastDirection to continue in same direction (if necessary)
 		switch e.LastDirection {
 		case elevio.MDUp:
 			if e.requestsAbove() {
@@ -92,6 +93,7 @@ func (e *Elevator) ChooseDirection() (elevio.MotorDirection, ElevatorBehavior) {
 	}
 }
 
+// check for assigned orders at floor
 func (e *Elevator) ShouldStop() bool {
 	switch e.Direction {
 	case elevio.MDDown:
@@ -110,39 +112,43 @@ func (e *Elevator) ShouldStop() bool {
 }
 
 func (e *Elevator) ClearAtCurrentFloor() {
+
+	// clearing cab calls
 	if e.Orders[e.FloorNr][BTCab].ElevatorID == e.ID {
 		e.Orders[e.FloorNr][BTCab].State = false
 		e.Orders[e.FloorNr][BTCab].Timestamp = time.Now()
 	}
+
+	// clearing hall calls
 	switch e.Direction {
 	case elevio.MDUp:
 		if e.Orders[e.FloorNr][BTHallUp].ElevatorID == e.ID {
-			e.clearHallCall(BTHallUp)
+			e.ClearHallCall(BTHallUp)
 		}
 		if !e.requestsAbove() && e.Orders[e.FloorNr][BTHallDown].ElevatorID == e.ID {
-			e.clearHallCall(BTHallDown)
+			e.ClearHallCall(BTHallDown)
 		}
 	case elevio.MDDown:
 		if e.Orders[e.FloorNr][BTHallDown].ElevatorID == e.ID {
-			e.clearHallCall(BTHallDown)
+			e.ClearHallCall(BTHallDown)
 		}
 		if !e.requestsBelow() && e.Orders[e.FloorNr][BTHallUp].ElevatorID == e.ID {
-			e.clearHallCall(BTHallUp)
+			e.ClearHallCall(BTHallUp)
 		}
 	case elevio.MDStop:
 		// Clear hall call in the direction we came from
 		switch e.LastDirection {
 		case elevio.MDUp:
 			if e.Orders[e.FloorNr][elevio.BTHallUp].State && e.Orders[e.FloorNr][BTHallUp].ElevatorID == e.ID && (e.FloorNr != config.NumFloors) {
-				e.clearHallCall(BTHallUp)
+				e.ClearHallCall(BTHallUp)
 			} else if e.Orders[e.FloorNr][BTHallDown].ElevatorID == e.ID {
-				e.clearHallCall(BTHallDown)
+				e.ClearHallCall(BTHallDown)
 			}
 		case elevio.MDDown:
 			if e.Orders[e.FloorNr][elevio.BTHallDown].State && e.Orders[e.FloorNr][BTHallDown].ElevatorID == e.ID && (e.FloorNr != 0) {
-				e.clearHallCall(BTHallDown)
+				e.ClearHallCall(BTHallDown)
 			} else if e.Orders[e.FloorNr][BTHallUp].ElevatorID == e.ID {
-				e.clearHallCall(BTHallUp)
+				e.ClearHallCall(BTHallUp)
 			}
 		}
 	}

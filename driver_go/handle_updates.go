@@ -29,6 +29,7 @@ func handleElevatorUpdates(
 		if elevRx.ID == elev.ID {
 			for floor := 0; floor < config.NumFloors; floor++ {
 				for btn := 0; btn < config.NumButtons; btn++ {
+					// Compare timestamps to ensure only newer updates are accepted
 					if elevRx.Orders[floor][btn].Timestamp.After(elev.Orders[floor][btn].Timestamp) {
 						elev.Orders[floor][btn] = elevRx.Orders[floor][btn]
 					}
@@ -73,6 +74,7 @@ func handlePeerUpdates(
 	runHraCh chan struct{},
 	elevatorMap map[string]*elevator.Elevator) {
 
+	// run for all connected elevators //DOUBLECHECK
 	for peerUpdate := range peerUpdateCh {
 		fmt.Printf("Peer update:\n")
 		fmt.Printf("  Peers:    %q\n", peerUpdate.Peers)
@@ -142,6 +144,7 @@ func handleRunHraRequest(
 		lostCopy := append([]string(nil), (*latestLost)...)
 		latestLostMutex.Unlock()
 
+		// new map with elevators that have been active for the last 5 seconds
 		activeElevators := make(map[string]*elevator.Elevator)
 
 		elevatorMapLock.Lock()

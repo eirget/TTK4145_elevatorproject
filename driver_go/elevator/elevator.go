@@ -83,26 +83,27 @@ func ElevatorInit(floorNr int, id int) *Elevator {
 	}
 }
 
-func WaitForValidFloor(d elevio.MotorDirection, drv_floors chan int) int {
+func WaitForValidFloor(d elevio.MotorDirection, drvFloors chan int) int {
 	floorCh := make(chan int)
-	go func() {
-		elevio.SetMotorDirection(d)
-		for {
-			select {
-			case floorSensor := <-drv_floors:
-				if floorSensor != -1 {
-					fmt.Println("Started at floor: ", floorSensor)
-					elevio.SetMotorDirection(elevio.MDStop)
-					floorCh <- floorSensor
-					return
-				}
-			case <-time.After(500 * time.Millisecond):
-				fmt.Println("Waiting for valid floor signal...")
-			}
-		}
-	}()
-
+	go FloorInit(d, drvFloors, floorCh) // HAR NÅ DEFINERT DENNE UNDER. SJEKK OM DET FUNKER
 	return <-floorCh
+}
+
+func FloorInit(d elevio.MotorDirection, drvFloors chan int, floorCh chan int) {
+	elevio.SetMotorDirection(d)
+	for {
+		select {
+		case floorSensor := <-drvFloors: // BURDE DISSE TO CASENE BYTTE PLASS?
+			if floorSensor != -1 {
+				fmt.Println("Started at floor: ", floorSensor)
+				elevio.SetMotorDirection(elevio.MDStop)
+				floorCh <- floorSensor
+				return
+			}
+		case <-time.After(500 * time.Millisecond):
+			fmt.Println("Waiting for valid floor signal...")
+		}
+	}
 }
 
 func (e *Elevator) HandleIdleState(doorTimer *time.Timer) {
@@ -192,7 +193,7 @@ func (e *Elevator) ShouldReopenForOppositeHallCall() bool {
 	}
 }
 
-func (e *Elevator) clearHallCall(btn int) {
+func (e *Elevator) ClearHallCall(btn int) {
 	e.Orders[e.FloorNr][btn].State = false
 	e.Orders[e.FloorNr][btn].Timestamp = time.Now()
 	e.Orders[e.FloorNr][btn].ElevatorID = 100
