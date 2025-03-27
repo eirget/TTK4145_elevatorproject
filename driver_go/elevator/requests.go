@@ -3,12 +3,11 @@ package elevator
 import (
 	"Driver_go/config"
 	"Driver_go/elevio"
-	"fmt"
 	"time"
 )
 
 func (e *Elevator) requestsAbove() bool {
-	for floor := e.FloorNr + 1; floor < config.NumFloors; floor++ { //blir "+1" feil, er nok riktig
+	for floor := e.FloorNr + 1; floor < config.NumFloors; floor++ {
 		for btn := 0; btn < config.NumButtons; btn++ {
 			if e.Orders[floor][btn].State && e.Orders[floor][btn].ElevatorID == e.ID {
 				return true
@@ -18,7 +17,6 @@ func (e *Elevator) requestsAbove() bool {
 	return false
 }
 
-// requestsBelow checks for requests below the current floor.
 func (e *Elevator) requestsBelow() bool {
 	for floor := 0; floor < e.FloorNr; floor++ {
 		for btn := 0; btn < config.NumButtons; btn++ {
@@ -30,7 +28,6 @@ func (e *Elevator) requestsBelow() bool {
 	return false
 }
 
-// requestsHere checks for requests at the current floor.
 func (e *Elevator) RequestsHere() bool {
 	for btn := 0; btn < config.NumButtons; btn++ {
 		if e.Orders[e.FloorNr][btn].State && e.Orders[e.FloorNr][btn].ElevatorID == e.ID {
@@ -75,7 +72,6 @@ func (e *Elevator) ChooseDirection() (elevio.MotorDirection, ElevatorBehavior) {
 				return elevio.MD_Down, EB_Moving
 			}
 			if e.RequestsHere() {
-				//if e.LastDirection
 				return elevio.MD_Stop, EB_DoorOpen
 			}
 		case elevio.MD_Down:
@@ -86,7 +82,6 @@ func (e *Elevator) ChooseDirection() (elevio.MotorDirection, ElevatorBehavior) {
 				return elevio.MD_Up, EB_Moving
 			}
 			if e.RequestsHere() {
-				//if e.LastDirection
 				return elevio.MD_Stop, EB_DoorOpen
 			}
 		}
@@ -97,7 +92,6 @@ func (e *Elevator) ChooseDirection() (elevio.MotorDirection, ElevatorBehavior) {
 	}
 }
 
-// shouldStop checks if the elevator should stop at the current floor.
 func (e *Elevator) ShouldStop() bool {
 	switch e.Direction {
 	case elevio.MD_Down:
@@ -116,8 +110,6 @@ func (e *Elevator) ShouldStop() bool {
 }
 
 func (e *Elevator) ClearAtCurrentFloor() {
-	fmt.Printf("Clearing Orders at floor %v with LastDirection: %v\n", e.FloorNr, e.LastDirection)
-	// Always clear cab call
 	if e.Orders[e.FloorNr][BT_Cab].ElevatorID == e.ID {
 		e.Orders[e.FloorNr][BT_Cab].State = false
 		e.Orders[e.FloorNr][BT_Cab].Timestamp = time.Now()
@@ -138,7 +130,7 @@ func (e *Elevator) ClearAtCurrentFloor() {
 			e.clearHallCall(BT_HallUp)
 		}
 	case elevio.MD_Stop:
-		// Clear hall call in the direction we just came from
+		// Clear hall call in the direction we came from
 		switch e.LastDirection {
 		case elevio.MD_Up:
 			if e.Orders[e.FloorNr][elevio.BT_HallUp].State && e.Orders[e.FloorNr][BT_HallUp].ElevatorID == e.ID && (e.FloorNr != config.NumFloors) {
@@ -158,7 +150,7 @@ func (e *Elevator) ClearAtCurrentFloor() {
 
 func AssignAllHallCallsToSelf(e *Elevator) {
 	for floor := 0; floor < config.NumFloors; floor++ {
-		for btn := 0; btn <= 1; btn++ { // HallUp and HallDown only
+		for btn := 0; btn <= 1; btn++ {
 			if e.Orders[floor][btn].State {
 				e.Orders[floor][btn].ElevatorID = e.ID
 				e.Orders[floor][btn].Timestamp = time.Now()

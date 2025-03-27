@@ -119,26 +119,23 @@ func (e *Elevator) HandleIdleState() {
 
 func (e *Elevator) StartMoving() {
 	e.LastActive = time.Now()
-	e.Direction = elevio.MotorDirection(e.Direction) // Ensure direction is updated
-	e.Behavior = EB_Moving                           // Update behavior
+	e.Direction = elevio.MotorDirection(e.Direction)
+	e.Behavior = EB_Moving
 	elevio.SetMotorDirection(e.Direction)
-	fmt.Println("Elevator started moving in direction:", e.Direction)
 }
 
 func (e *Elevator) OpenDoor() {
 	e.LastActive = time.Now()
-	//e.LastDirection = e.Direction
-	e.Behavior = EB_DoorOpen // Set state to door open
+	e.Behavior = EB_DoorOpen
 	elevio.SetDoorOpenLamp(true)
 	e.ClearAtCurrentFloor()
-	fmt.Println("Door opened at floor", e.FloorNr)
 }
 
 func (e *Elevator) StopAtFloor() {
 	e.LastActive = time.Now()
-	e.LastDirection = e.Direction //NEW
-	e.Direction = elevio.MD_Stop  // Stop the motor
-	e.Behavior = EB_DoorOpen      // Set state to door open
+	e.LastDirection = e.Direction
+	e.Direction = elevio.MD_Stop
+	e.Behavior = EB_DoorOpen
 	elevio.SetMotorDirection(e.Direction)
 	elevio.SetDoorOpenLamp(true)
 	e.ClearAtCurrentFloor()
@@ -148,15 +145,11 @@ func (e *Elevator) CloseDoorAndResume() {
 	e.LastActive = time.Now()
 	e.Behavior = EB_Idle
 	elevio.SetDoorOpenLamp(false)
-	//e.ClearAtCurrentFloor()   //this could be wrong
 	e.Direction, e.Behavior = e.ChooseDirection()
 	elevio.SetMotorDirection(e.Direction)
 	if e.Behavior == EB_DoorOpen {
 		e.OpenDoor()
 	}
-	fmt.Println("Resuming movement in direction:\n", e.Direction)
-	fmt.Println("Resuming movement with behavior:\n", e.Behavior)
-
 }
 
 func (e *Elevator) SetLights() {
@@ -173,7 +166,7 @@ func (e *Elevator) SetLights() {
 
 func (e *Elevator) HasPendingHallOrders() bool {
 	for floor := 0; floor < config.NumFloors; floor++ {
-		for btn := 0; btn < config.NumButtons-1; btn++ {
+		for btn := 0; btn < config.NumHallButtons; btn++ {
 			if e.Orders[floor][btn].State {
 				return true
 			}
@@ -187,11 +180,9 @@ func (e *Elevator) ShouldReopenForOppositeHallCall() bool {
 	case elevio.MD_Up:
 		return e.Orders[e.FloorNr][BT_HallDown].State &&
 			!e.requestsAbove()
-		//e.requestsBelow()
 	case elevio.MD_Down:
 		return e.Orders[e.FloorNr][BT_HallUp].State &&
 			!e.requestsBelow()
-		//e.requestsAbove()
 	default:
 		return false
 	}

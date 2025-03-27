@@ -54,8 +54,6 @@ func hallRequestAssigner(elev *elevator.Elevator,
 	elevStateTx <- *elev
 }
 
-
-
 func buildHRAInput(elev *elevator.Elevator, activeElevators map[string]*elevator.Elevator) HRAInput {
 
 	hallRequestLock.Lock()

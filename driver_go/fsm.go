@@ -7,9 +7,6 @@ import (
 	"time"
 )
 
-// burde kanksje lages i main
-//var newOrderFlag bool
-
 func fsm(e *elevator.Elevator,
 	elevStateTx chan elevator.Elevator,
 	req_chan chan elevio.ButtonEvent,
@@ -25,7 +22,7 @@ func fsm(e *elevator.Elevator,
 	for {
 		select {
 		case newReq := <-req_chan:
-			fsmHandleRequestButtonPress(newReq, e, elevStateTx, newOrderCh)
+			fsmHandleNewRequest(newReq, e, elevStateTx, newOrderCh)
 
 		case <-time.After(100 * time.Millisecond):
 			fsmHandleIdleState(e, elevStateTx, doorTimer)
@@ -35,26 +32,22 @@ func fsm(e *elevator.Elevator,
 
 		case <-doorTimer.C:
 			fsmHandleDoorTimeout(e, doorTimer, elevStateTx)
-		//maybe name obstructionState? I misunderstood this variable name
+
 		case isObstructed := <-obstr_chan:
 			fmt.Println("Obstruction happened")
 			fsmHandleObstruction(isObstructed, e)
 
 		case isStopped := <-stop_chan:
 			fsmHandleEmergencyStop(isStopped, e, number_of_floors)
-
-			//case <-time.After(100 * time.Millisecond):
-			//elevStateTx <- *e
 		}
 	}
 }
 
-func fsmHandleRequestButtonPress(newReq elevio.ButtonEvent, e *elevator.Elevator, elevStateTx chan elevator.Elevator, newOrderCh chan struct{}) {
+func fsmHandleNewRequest(newReq elevio.ButtonEvent, e *elevator.Elevator, elevStateTx chan elevator.Elevator, newOrderCh chan struct{}) {
 	fmt.Printf("%+v\n", newReq)
 	e.Orders[newReq.Floor][newReq.Button].State = true
 	e.Orders[newReq.Floor][newReq.Button].Timestamp = time.Now()
 
-	//*new_order_flag = true
 	elevStateTx <- *e
 
 	if newReq.Button == elevio.BT_Cab {
@@ -69,15 +62,6 @@ func fsmHandleRequestButtonPress(newReq elevio.ButtonEvent, e *elevator.Elevator
 
 func fsmHandleIdleState(e *elevator.Elevator, elevStateTx chan elevator.Elevator, doorTimer *time.Timer) {
 	if e.Behavior == elevator.EB_Idle {
-		//this will probably never be added again
-		/*
-			if e.ShouldStop() {
-				fmt.Println("Reopening at same floor to serve additional order")
-				e.StopAtFloor()
-				doorTimer.Reset(3 * time.Second)
-				return
-			}
-		*/
 		e.HandleIdleState()
 		if e.Behavior == elevator.EB_DoorOpen {
 			doorTimer.Reset(3 * time.Second)
@@ -89,19 +73,18 @@ func fsmHandleIdleState(e *elevator.Elevator, elevStateTx chan elevator.Elevator
 func fsmHandleNewFloor(a int, e *elevator.Elevator, elevStateTx chan elevator.Elevator, doorTimer *time.Timer) {
 	e.FloorNr = a
 	elevio.SetFloorIndicator(a)
+	e.LastActive = time.Now()
 
-	//ShouldStop returns true if it has pending orders in its current direction, or if you just in general have no reason to continue in your current direction
 	if e.ShouldStop() {
 		e.StopAtFloor()
 		doorTimer.Reset(3 * time.Second)
 	}
-
 	elevStateTx <- *e
 }
 
 func fsmHandleDoorTimeout(e *elevator.Elevator, doorTimer *time.Timer, elevStateTx chan elevator.Elevator) {
 	if e.ShouldReopenForOppositeHallCall() {
-		fmt.Printf("Yes, should reopen for opposite hall call")
+		fmt.Println("Should reopen for opposite hall call")
 
 		if e.LastDirection == elevio.MD_Up {
 			e.LastDirection = elevio.MD_Down
@@ -119,8 +102,6 @@ func fsmHandleDoorTimeout(e *elevator.Elevator, doorTimer *time.Timer, elevState
 		doorTimer.Reset(500 * time.Millisecond)
 		return
 	}
-	fmt.Println("Close door and resume called")
-	//what is e.Direction here? we think it is stop. if the e.ShouldReopenForOppositeHallCall() never happened
 	e.CloseDoorAndResume()
 	elevStateTx <- *e
 }
