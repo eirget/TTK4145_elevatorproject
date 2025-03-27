@@ -83,14 +83,6 @@ func ElevatorInit(floorNr int, id int) *Elevator {
 	}
 }
 
-func initOrders() {
-	for floor := 0; floor < config.NumFloors; floor++ {
-		if floor == 0 {
-			OrderType
-		}
-	}
-}
-
 func WaitForValidFloor(d elevio.MotorDirection, drv_floors chan int) int {
 	floorCh := make(chan int)
 	go func() {

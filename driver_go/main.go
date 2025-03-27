@@ -61,6 +61,7 @@ func main() {
 	runHraCh := make(chan struct{}, 1)
 	receiveRunHraCh := make(chan struct{}, 1)
 
+	//channel for sending orders       			//STEMMER DET?
 	newOrderCh := make(chan struct{}, 1)
 
 	network.NetworkInit(idStr, peerUpdateCh, peerTxEnable, elevStateTx, elevStateRx, runHraCh, receiveRunHraCh)

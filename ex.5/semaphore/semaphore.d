@@ -49,10 +49,10 @@ class Resource(T) {
         value = v;
         busy = false;
         
-        if (numWaiting[1] > 0) {
+        if (numWaiting[1] > 0) { //partall
             numWaiting[1]--;
             sems[1].notify(); //Prioriterer høyere prioritet først
-        } else if (numWaiting[0] > 0) {
+        } else if (numWaiting[0] > 0) { //oddetall
             numWaiting[0]--;
             sems[0].notify();
         } else {

@@ -25,6 +25,7 @@ type HRAInput struct {
 	States       map[string]HRAElevState `json:"states"`
 }
 
+// assign an elevator's ID for each order
 func hallRequestAssigner(
 	elev *elevator.Elevator,
 	activeElevators map[string]*elevator.Elevator,
@@ -51,7 +52,7 @@ func hallRequestAssigner(
 
 		updateHallOrders(peerID, elev, newRequests, assignedID, activeElevators, id)
 	}
-	hallRequestLock.Unlock()
+	hallRequestLock.Unlock() //KAN VI SETTE DEFER PÅ ALLE UNLOCKS ELLER ER DET FEIL OM DET SKAL SKJE TING ETTERPÅ?
 	elevStateTx <- *elev
 }
 
@@ -144,9 +145,9 @@ func updateHallOrders(
 	}
 	if peerID == localID {
 		//reflect updated orders in this local elevator's view
-		for f := 0; f < config.NumFloors; f++ {
-			elev.Orders[f][0] = activeElev.Orders[f][0]
-			elev.Orders[f][1] = activeElev.Orders[f][1]
+		for floor := 0; floor < config.NumFloors; floor++ {
+			elev.Orders[floor][0] = activeElev.Orders[floor][0]
+			elev.Orders[floor][1] = activeElev.Orders[floor][1]
 		}
 	}
 }

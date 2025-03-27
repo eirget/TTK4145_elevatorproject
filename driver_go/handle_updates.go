@@ -60,6 +60,7 @@ func handleElevatorUpdates(
 	}
 }
 
+// update list of elevators connected/disconnected from the network  //DOUBLECHECK
 func handlePeerUpdates(
 	peerUpdateCh <-chan peers.PeerUpdate,
 	latestLost *[]string,
@@ -109,6 +110,7 @@ func handlePeerUpdates(
 	}
 }
 
+// update relevant properties when a button is pressed //DONT LIKE THIS
 func handleRunHraRequest(
 	receiveRunHraCh <-chan struct{},
 	localElevator *elevator.Elevator,
