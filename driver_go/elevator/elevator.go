@@ -28,18 +28,16 @@ const (
 )
 
 type Elevator struct {
-	//mutex over states maybe to protect
 	ID            int
-	Floor_nr      int
+	FloorNr       int
 	Direction     elevio.MotorDirection
-	LastDirection elevio.MotorDirection //NEW
-	On_floor      bool
-	Door_open     bool
+	LastDirection elevio.MotorDirection
+	OnFloor       bool
+	DoorOpen      bool
 	Obstruction   bool
 	Orders        [4][3]OrderType
 	Behavior      ElevatorBehavior
 	LastActive    time.Time
-	Config        Config
 }
 
 var DirectionMap = map[elevio.MotorDirection]string{
@@ -65,14 +63,14 @@ const (
 	CV_InDirn
 )
 
-func ElevatorInit(floor_nr int, id int) *Elevator {
+func ElevatorInit(floorNr int, id int) *Elevator {
 	return &Elevator{
 		ID:            id,
-		Floor_nr:      floor_nr,
+		FloorNr:       floorNr,
 		Direction:     elevio.MD_Stop,
 		LastDirection: elevio.MD_Up,
-		On_floor:      true,
-		Door_open:     false,
+		OnFloor:       true,
+		DoorOpen:      false,
 		Obstruction:   false,
 		Orders: [4][3]OrderType{
 			{{false, 100, time.Time{}}, {false, 555, time.Time{}}, {false, id, time.Time{}}},
@@ -82,8 +80,29 @@ func ElevatorInit(floor_nr int, id int) *Elevator {
 		},
 		Behavior:   EB_Idle,
 		LastActive: time.Now(),
-		Config:     Config{ClearRequestVariant: CV_InDirn},
 	}
+}
+
+func WaitForValidFloor(d elevio.MotorDirection, drv_floors chan int) int {
+	floorChan := make(chan int)
+	go func() {
+		elevio.SetMotorDirection(d)
+		for {
+			select {
+			case floorSensor := <-drv_floors:
+				if floorSensor != -1 {
+					fmt.Println("Started at floor: ", floorSensor)
+					elevio.SetMotorDirection(elevio.MD_Stop)
+					floorChan <- floorSensor
+					return
+				}
+			case <-time.After(500 * time.Millisecond):
+				fmt.Println("Waiting for valid floor signal...")
+			}
+		}
+	}()
+
+	return <-floorChan
 }
 
 func (e *Elevator) HandleIdleState() {
@@ -112,7 +131,7 @@ func (e *Elevator) OpenDoor() {
 	e.Behavior = EB_DoorOpen // Set state to door open
 	elevio.SetDoorOpenLamp(true)
 	e.ClearAtCurrentFloor()
-	fmt.Println("Door opened at floor", e.Floor_nr)
+	fmt.Println("Door opened at floor", e.FloorNr)
 }
 
 func (e *Elevator) StopAtFloor() {
@@ -152,7 +171,7 @@ func (e *Elevator) SetLights() {
 	}
 }
 
-func (e *Elevator) HasPendingOrders() bool {
+func (e *Elevator) HasPendingHallOrders() bool {
 	for floor := 0; floor < config.NumFloors; floor++ {
 		for btn := 0; btn < config.NumButtons-1; btn++ {
 			if e.Orders[floor][btn].State {
@@ -163,19 +182,23 @@ func (e *Elevator) HasPendingOrders() bool {
 	return false
 }
 
-// NEW
-// we have to actually change the direction as wellS
 func (e *Elevator) ShouldReopenForOppositeHallCall() bool {
 	switch e.LastDirection {
 	case elevio.MD_Up:
-		return e.Orders[e.Floor_nr][BT_HallDown].State &&
+		return e.Orders[e.FloorNr][BT_HallDown].State &&
 			!e.requestsAbove()
 		//e.requestsBelow()
 	case elevio.MD_Down:
-		return e.Orders[e.Floor_nr][BT_HallUp].State &&
+		return e.Orders[e.FloorNr][BT_HallUp].State &&
 			!e.requestsBelow()
 		//e.requestsAbove()
 	default:
 		return false
 	}
+}
+
+func (e *Elevator) clearHallCall(btn int) {
+	e.Orders[e.FloorNr][btn].State = false
+	e.Orders[e.FloorNr][btn].Timestamp = time.Now()
+	e.Orders[e.FloorNr][btn].ElevatorID = 100
 }

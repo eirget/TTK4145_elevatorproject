@@ -210,25 +210,3 @@ func ElevioInit(
 	SetDoorOpenLamp(false)
 	SetStopLamp(false)
 }
-
-func WaitForValidFloor(d MotorDirection, drv_floors chan int) int {
-	floorChan := make(chan int)
-	go func() {
-		SetMotorDirection(d)
-		for {
-			select {
-			case a := <-drv_floors:
-				if a != -1 {
-					fmt.Println("Started at floor: ", a)
-					SetMotorDirection(MD_Stop)
-					floorChan <- a
-					return
-				}
-			case <-time.After(500 * time.Millisecond):
-				fmt.Println("Waiting for valid floor signal...")
-			}
-		}
-	}()
-
-	return <-floorChan
-}

@@ -18,28 +18,29 @@ func main() {
 
 	hraExecutable := "hall_request_assigner"
 
-	//make this automatic later
-	var id string
-	flag.StringVar(&id, "id", "", "id of this peer")
 	var port string
 	flag.StringVar(&port, "port", "", "port of this peer")
 	flag.Parse()
 
+	//automatically assign ID
+	portNum, err := strconv.Atoi(port)
+	if err != nil {
+		fmt.Printf("Invalid port number %v \n", err)
+	}
+	id := (portNum - 20000)
+	idStr := strconv.Itoa(id)
+
 	var latestLost []string
 	var latestLostMutex sync.Mutex
 
-	//NEW
-	var disconnectedFromNetwork = true //assume until proven otherwise
+	var disconnectedFromNetwork = true
 	var disconnectedMutex sync.RWMutex
 
-	//create map to store elevator states for all elevators on system, to backup orders
-	//why string? maybe just decide that all cases of ID should just be string
+	//map to store elevator states for all elevators on system, backup for orders
 	elevatorMap := make(map[string]*elevator.Elevator)
 
 	addr := "localhost:" + port
 	elevio.Init(addr, config.NumFloors)
-
-	//fmt.Printf("Before go routines \n")
 
 	drv_buttons := make(chan elevio.ButtonEvent)
 	drv_floors := make(chan int)
@@ -48,42 +49,44 @@ func main() {
 
 	elevio.ElevioInit(drv_buttons, drv_floors, drv_obstr, drv_stop)
 
-	//make a channel for receiving updates on the id's of the peers that are alive on the network
+	//channels for receiving and transmitting updates on the id's of the peers that are alive on the network
 	peerUpdateCh := make(chan peers.PeerUpdate)
-	//we can enable/disable the transmitter after it has been started, coulb be used to signal that we are unavailable
 	peerTxEnable := make(chan bool)
-	//we make channels for sending and receiving our custom data types
+
+	//channels for sending and receiving Elevator types
 	elevStateTx := make(chan elevator.Elevator)
 	elevStateRx := make(chan elevator.Elevator)
 
-	runHraCh := make(chan bool, 10)
-	receiveRunHraCh := make(chan bool, 10)
+	//channels for sending and receiving runHra signal
+	runHraCh := make(chan struct{}, 1)
+	receiveRunHraCh := make(chan struct{}, 1)
 
-	network.NetworkInit(id, peerUpdateCh, peerTxEnable, elevStateTx, elevStateRx, runHraCh, receiveRunHraCh)
+	newOrderCh := make(chan struct{}, 1)
 
-	eAtFloor := elevio.WaitForValidFloor(elevio.MD_Up, drv_floors)
+	network.NetworkInit(idStr, peerUpdateCh, peerTxEnable, elevStateTx, elevStateRx, runHraCh, receiveRunHraCh)
+
+	eAtFloor := elevator.WaitForValidFloor(elevio.MD_Up, drv_floors)
 	fmt.Println("Elevator initalized at floor: ", eAtFloor)
 
-	id_num, _ := strconv.Atoi(id)
-
-	localElevator := elevator.ElevatorInit(eAtFloor, id_num) //figure out if the impostet file should change name (like this) or of the elevator.go file should change name, or maybe nothing should just be named elevator!
+	localElevator := elevator.ElevatorInit(eAtFloor, id)
 
 	elevStateTx <- *localElevator
 
-	elevio.SetFloorIndicator(localElevator.Floor_nr)
-
-	go fsm(localElevator, elevStateTx, drv_buttons, drv_floors, drv_obstr, drv_stop, config.NumFloors)
-
-	go elevator.MonitorActivity(localElevator, runHraCh)
-
-	go localElevator.RunLightUpdater()
+	elevio.SetFloorIndicator(localElevator.FloorNr)
 
 	fmt.Printf("Started elevator system \n")
 
-	go handleElevatorUpdates(localElevator, elevStateRx, elevatorMap, runHraCh)
+	go fsm(localElevator, elevStateTx, drv_buttons, drv_floors, drv_obstr, drv_stop, config.NumFloors, newOrderCh)
+
+	go elevator.MonitorActivity(localElevator, runHraCh) //SHOULD WE TRY TO MAKE THIS A METHOD?
+
+	go localElevator.LightUpdater()
+
+	go handleElevatorUpdates(localElevator, elevStateRx, elevatorMap, runHraCh, newOrderCh)
 
 	go handlePeerUpdates(peerUpdateCh, &latestLost, &latestLostMutex, &disconnectedFromNetwork, &disconnectedMutex, elevStateTx, localElevator, &elevatorMapLock, runHraCh, elevatorMap)
 
 	go handleRunHraRequest(receiveRunHraCh, localElevator, elevatorMap, &elevatorMapLock, elevStateTx, elevStateRx, &latestLost, &latestLostMutex, &disconnectedFromNetwork, &disconnectedMutex, hraExecutable)
 
+	select {}
 }

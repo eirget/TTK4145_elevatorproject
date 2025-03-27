@@ -13,7 +13,7 @@ import (
 )
 
 // update elevator to have newest state of other elevators
-func handleElevatorUpdates(localElevator *elevator.Elevator, elevStateRx <-chan elevator.Elevator, elevatorMap map[string]*elevator.Elevator, runHraCh chan bool) {
+func handleElevatorUpdates(localElevator *elevator.Elevator, elevStateRx <-chan elevator.Elevator, elevatorMap map[string]*elevator.Elevator, runHraCh chan struct{}, newOrderCh chan struct{}) {
 	for elevRx := range elevStateRx {
 
 		elevatorMapLock.Lock()
@@ -58,9 +58,16 @@ func handleElevatorUpdates(localElevator *elevator.Elevator, elevStateRx <-chan 
 
 		localElevator.SetLights()
 
-		if newOrderFlag {
-			runHraCh <- true
-			newOrderFlag = false
+		//if newOrderFlag {
+		//	runHraCh <- true
+		//newOrderFlag = false
+		//}
+		for range newOrderCh {
+			select {
+			case runHraCh <- struct{}{}: // Trigger hall request reassignment
+			default:
+
+			}
 		}
 	}
 }
@@ -74,7 +81,7 @@ func handlePeerUpdates(
 	elevStateTx chan<- elevator.Elevator,
 	localElevator *elevator.Elevator,
 	elevatorMapLock *sync.Mutex,
-	runHraCh chan bool,
+	runHraCh chan struct{},
 	elevatorMap map[string]*elevator.Elevator) {
 	for peerUpdate := range peerUpdateCh {
 		fmt.Printf("Peer update:\n")
@@ -105,17 +112,17 @@ func handlePeerUpdates(
 		elevatorMapLock.Unlock()
 
 		if len(peerUpdate.Lost) != 0 {
-			runHraCh <- true
+			select {
+			case runHraCh <- struct{}{}:
+			default:
+
+			}
 		}
 	}
-
-	//maybe both variable and channel name should include that these are states, maybe change names
-	//case elevRx := <-elevStateRx: //can the buffer cause packet loss?
-
 }
 
 func handleRunHraRequest(
-	receiveRunHraCh <-chan bool,
+	receiveRunHraCh <-chan struct{},
 	localElevator *elevator.Elevator,
 	elevatorMap map[string]*elevator.Elevator,
 	elevatorMapLock *sync.Mutex,
@@ -170,6 +177,11 @@ func handleRunHraRequest(
 		elevatorMapLock.Unlock()
 
 		id := strconv.Itoa(localElevator.ID)
+
+		if len(activeElevators) == 0 {
+			fmt.Printf("No active elevators")
+		}
+
 		go hallRequestAssigner(localElevator, activeElevators, id, hraExecutable, elevStateRx)
 	}
 

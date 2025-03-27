@@ -11,7 +11,7 @@ func NetworkInit(id string,
 	peerTxEnable chan bool,
 	elevStateTx chan elevator.Elevator,
 	elevStateRx chan elevator.Elevator,
-	runHra chan bool, receiveRunHra chan bool) {
+	runHra chan struct{}, receiveRunHra chan struct{}) {
 
 	// Start network-related goroutines
 	go peers.Transmitter(15622, id, peerTxEnable)

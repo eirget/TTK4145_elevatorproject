@@ -8,7 +8,7 @@ import (
 )
 
 // burde kanksje lages i main
-var newOrderFlag bool
+//var newOrderFlag bool
 
 func fsm(e *elevator.Elevator,
 	elevStateTx chan elevator.Elevator,
@@ -16,7 +16,8 @@ func fsm(e *elevator.Elevator,
 	new_floor_chan chan int,
 	obstr_chan chan bool,
 	stop_chan chan bool,
-	number_of_floors int) {
+	number_of_floors int,
+	newOrderCh chan struct{}) {
 
 	doorTimer := time.NewTimer(0)
 	<-doorTimer.C
@@ -24,7 +25,7 @@ func fsm(e *elevator.Elevator,
 	for {
 		select {
 		case newReq := <-req_chan:
-			fsmHandleRequestButtonPress(newReq, e, elevStateTx, &newOrderFlag)
+			fsmHandleRequestButtonPress(newReq, e, elevStateTx, newOrderCh)
 
 		case <-time.After(100 * time.Millisecond):
 			fsmHandleIdleState(e, elevStateTx, doorTimer)
@@ -48,20 +49,22 @@ func fsm(e *elevator.Elevator,
 	}
 }
 
-func fsmHandleRequestButtonPress(a elevio.ButtonEvent, e *elevator.Elevator, elevStateTx chan elevator.Elevator, new_order_flag *bool) {
-	fmt.Printf("%+v\n", a)
-	e.Orders[a.Floor][a.Button].State = true
-	e.Orders[a.Floor][a.Button].Timestamp = time.Now()
+func fsmHandleRequestButtonPress(newReq elevio.ButtonEvent, e *elevator.Elevator, elevStateTx chan elevator.Elevator, newOrderCh chan struct{}) {
+	fmt.Printf("%+v\n", newReq)
+	e.Orders[newReq.Floor][newReq.Button].State = true
+	e.Orders[newReq.Floor][newReq.Button].Timestamp = time.Now()
 
-	*new_order_flag = true
+	//*new_order_flag = true
 	elevStateTx <- *e
 
-	//fmt.Println("orders after button press: ", e.Orders)
-
-	if a.Button == elevio.BT_Cab {
-		elevio.SetButtonLamp(a.Button, a.Floor, true)
+	if newReq.Button == elevio.BT_Cab {
+		elevio.SetButtonLamp(newReq.Button, newReq.Floor, true)
 	}
 
+	select {
+	case newOrderCh <- struct{}{}:
+	default:
+	}
 }
 
 func fsmHandleIdleState(e *elevator.Elevator, elevStateTx chan elevator.Elevator, doorTimer *time.Timer) {
@@ -84,7 +87,7 @@ func fsmHandleIdleState(e *elevator.Elevator, elevStateTx chan elevator.Elevator
 }
 
 func fsmHandleNewFloor(a int, e *elevator.Elevator, elevStateTx chan elevator.Elevator, doorTimer *time.Timer) {
-	e.Floor_nr = a
+	e.FloorNr = a
 	elevio.SetFloorIndicator(a)
 
 	//ShouldStop returns true if it has pending orders in its current direction, or if you just in general have no reason to continue in your current direction

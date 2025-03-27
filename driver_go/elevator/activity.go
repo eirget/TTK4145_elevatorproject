@@ -5,19 +5,19 @@ import (
 	"time"
 )
 
-// where should this go???
-func MonitorActivity(e *Elevator, runHra chan<- bool) {
-	ticker := time.NewTicker(1 * time.Second) // Check every second
+func MonitorActivity(e *Elevator, runHraCh chan<- struct{}) {
+	ticker := time.NewTicker(1 * time.Second)
 	defer ticker.Stop()
-	fmt.Printf("Last active: %v \n: ", e.LastActive)
-	// need to double check with some sort of "heartbeat" if it actually doesnt work, update lastActive if nothing is wrong
 	for range ticker.C {
-		if time.Since(e.LastActive) > 5*time.Second { // Elevator inactive for 5+ seconds
+		if time.Since(e.LastActive) > 7*time.Second {
 			fmt.Println("I have been inactive")
-			if e.HasPendingOrders() {
+			if e.HasPendingHallOrders() {
 				fmt.Println("And I have pending orders, calling hall request assigner")
-				runHra <- true // Trigger hall request reassignment
-				//return
+				select {
+				case runHraCh <- struct{}{}: // Trigger hall request reassignment
+				default:
+
+				}
 			}
 		}
 	}
