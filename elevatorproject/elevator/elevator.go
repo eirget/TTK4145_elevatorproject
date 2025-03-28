@@ -93,7 +93,7 @@ func FloorInit(d elevio.MotorDirection, drvFloors chan int, floorCh chan int) {
 	elevio.SetMotorDirection(d)
 	for {
 		select {
-		case floorSensor := <-drvFloors: 
+		case floorSensor := <-drvFloors:
 			if floorSensor != -1 {
 				fmt.Println("Started at floor: ", floorSensor)
 				elevio.SetMotorDirection(elevio.MDStop)

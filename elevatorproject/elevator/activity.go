@@ -14,7 +14,7 @@ func MonitorActivity(e *Elevator, runHraCh chan<- struct{}) {
 			if e.HasPendingHallOrders() {
 				fmt.Println("And I have pending orders, calling hall request assigner")
 				select {
-				case runHraCh <- struct{}{}: // trigger hall request reassignment
+				case runHraCh <- struct{}{}: // Trigger hall request reassignment
 				default:
 
 				}

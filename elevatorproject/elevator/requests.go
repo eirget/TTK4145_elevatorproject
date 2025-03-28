@@ -93,7 +93,7 @@ func (e *Elevator) ChooseDirection() (elevio.MotorDirection, ElevatorBehavior) {
 	}
 }
 
-// check for assigned orders at floor or no more orders
+// check for assigned orders at floor or noe more orders
 func (e *Elevator) ShouldStop() bool {
 	switch e.Direction {
 	case elevio.MDDown:
