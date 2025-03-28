@@ -18,11 +18,11 @@ func NetworkInit(
 	go peers.Transmitter(15622, id, peerTxEnable)
 	go peers.Receiver(15622, peerUpdateCh)
 
-	// channel for communicating buttonpresses
+	// channel for communicating Elevator structs
 	go bcast.Transmitter(20456, elevStateTx)
 	go bcast.Receiver(20456, elevStateRx)
 
-	// channel for communicating assigned ID for each order in queue
+	// channel for communicating signals to runHra
 	go bcast.Transmitter(20032, runHra)
 	go bcast.Receiver(20032, receiveRunHra)
 
