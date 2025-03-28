@@ -61,7 +61,7 @@ func handleElevatorUpdates(
 	}
 }
 
-// update list of elevators connected/disconnected from the network  //DOUBLECHECK
+// deal with updated lists of elevators connected/disconnected from the network
 func handlePeerUpdates(
 	peerUpdateCh <-chan peers.PeerUpdate,
 	latestLost *[]string,
@@ -74,7 +74,7 @@ func handlePeerUpdates(
 	runHraCh chan struct{},
 	elevatorMap map[string]*elevator.Elevator) {
 
-	// run for all connected elevators //DOUBLECHECK
+	// run every time a list is updated
 	for peerUpdate := range peerUpdateCh {
 		fmt.Printf("Peer update:\n")
 		fmt.Printf("  Peers:    %q\n", peerUpdate.Peers)
@@ -112,7 +112,7 @@ func handlePeerUpdates(
 	}
 }
 
-// update relevant properties when a button is pressed //DONT LIKE THIS
+// triggers reassignment of hall requests, concidering connectivity and recent elevator activity
 func handleRunHraRequest(
 	receiveRunHraCh <-chan struct{},
 	localElevator *elevator.Elevator,
@@ -144,7 +144,7 @@ func handleRunHraRequest(
 		lostCopy := append([]string(nil), (*latestLost)...)
 		latestLostMutex.Unlock()
 
-		// new map with elevators that have been active for the last 5 seconds
+		// new map with the connected elevators that have been active for the last 5 seconds
 		activeElevators := make(map[string]*elevator.Elevator)
 
 		elevatorMapLock.Lock()

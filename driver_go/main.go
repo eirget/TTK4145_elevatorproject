@@ -61,7 +61,7 @@ func main() {
 	runHraCh := make(chan struct{}, 1)
 	receiveRunHraCh := make(chan struct{}, 1)
 
-	//channel for sending orders       			//STEMMER DET?
+	//channel for signaling orders
 	newOrderCh := make(chan struct{}, 1)
 
 	network.NetworkInit(idStr, peerUpdateCh, peerTxEnable, elevStateTx, elevStateRx, runHraCh, receiveRunHraCh)
@@ -79,7 +79,7 @@ func main() {
 
 	go fsm(localElevator, elevStateTx, drvButtons, drvFloors, drvObstr, drvStop, newOrderCh)
 
-	go elevator.MonitorActivity(localElevator, runHraCh) //SHOULD WE TRY TO MAKE THIS A METHOD?
+	go elevator.MonitorActivity(localElevator, runHraCh)
 
 	go localElevator.LightUpdater()
 

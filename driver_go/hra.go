@@ -48,11 +48,9 @@ func hallRequestAssigner(
 	for peerID, newRequests := range output {
 		assignedID, _ := strconv.Atoi(peerID)
 
-		fmt.Println("New requests from HRA:", newRequests) //MAYBE REMOVE IN THE END
-
 		updateHallOrders(peerID, elev, newRequests, assignedID, activeElevators, id)
 	}
-	hallRequestLock.Unlock() //KAN VI SETTE DEFER PÅ ALLE UNLOCKS ELLER ER DET FEIL OM DET SKAL SKJE TING ETTERPÅ?
+	hallRequestLock.Unlock()
 	elevStateTx <- *elev
 }
 

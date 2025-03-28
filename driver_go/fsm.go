@@ -71,9 +71,6 @@ func fsmHandleIdleState(
 
 	if elev.Behavior == elevator.EBIdle {
 		elev.HandleIdleState(doorTimer)
-		if elev.Behavior == elevator.EBDoorOpen {
-			//doorTimer.Reset(3 * time.Second)
-		}
 	}
 	elevStateTx <- *elev
 }
