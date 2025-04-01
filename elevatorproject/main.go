@@ -18,17 +18,12 @@ func main() {
 
 	hraExecutable := "hall_request_assigner"
 
+	var idStr string
+	flag.StringVar(&idStr, "id", "", "id of this peer")
 	var port string
 	flag.StringVar(&port, "port", "", "port of this peer")
 	flag.Parse()
-
-	//automatically assign ID
-	portNum, err := strconv.Atoi(port)
-	if err != nil {
-		fmt.Printf("Invalid port number %v \n", err)
-	}
-	id := (portNum - 10000)
-	idStr := strconv.Itoa(id)
+	id, _ := strconv.Atoi(idStr)
 
 	var latestLost []string
 	var latestLostMutex sync.Mutex
