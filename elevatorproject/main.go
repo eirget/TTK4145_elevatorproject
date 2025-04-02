@@ -5,10 +5,12 @@ import (
 	"Driver_go/elevator"
 	"Driver_go/elevio"
 	"Driver_go/network"
+	"Driver_go/network/localip"
 	"Driver_go/network/peers"
 	"flag"
 	"fmt"
 	"strconv"
+	"strings"
 	"sync"
 )
 
@@ -22,12 +24,17 @@ func main() {
 	flag.StringVar(&port, "port", "", "port of this peer")
 	flag.Parse()
 
-	//automatically assign ID
-	portNum, err := strconv.Atoi(port)
+	localIP, err := localip.LocalIP()
 	if err != nil {
-		fmt.Printf("Invalid port number %v \n", err)
+		fmt.Println("Failed to get local IP:", err)
 	}
-	id := (portNum - 10000)
+	ipParts := strings.Split(localIP, ".")
+	id := 0
+	if len(ipParts) == 4 {
+		part2, _ := strconv.Atoi(ipParts[2])
+		part3, _ := strconv.Atoi(ipParts[3])
+		id = part2*100 + part3
+	}
 	idStr := strconv.Itoa(id)
 
 	var latestLost []string
